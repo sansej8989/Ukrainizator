@@ -1,0 +1,3 @@
+Invoke-PS2EXE -InputFile "D:\Shelenko\main\install languges 3\install languges.ps1" `
+              -OutputFile "D:\Shelenko\main\install languges 3\Ukrainizator.exe" `
+              -icon "D:\Shelenko\main\install languges 3\ukraine.ico" `
