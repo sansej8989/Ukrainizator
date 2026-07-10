@@ -5,7 +5,8 @@
 
 #region === Налаштування ===
 $scriptVersion = '1.6.0'
-$logFile = Join-Path $env:TEMP "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+Get-ChildItem -Path $PSScriptRoot -Filter 'Ukrainizator_*.log' -File | Remove-Item -Force
+$logFile = Join-Path $PSScriptRoot "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 $startTime = Get-Date
 
 function Write-Log {
@@ -29,9 +30,9 @@ function Write-Step {
 function Show-ProgressBar {
     param([int]$Percent, [string]$Label = '')
     $barSize = 30
-    $filled = [math]::Floor($Percent / 100 * $barSize)
-    $empty = $barSize - $filled
-    $bar = [char]9608 * $filled + [char]9617 * $empty
+    $filled = [int][math]::Floor($Percent / 100 * $barSize)
+    $empty = [int]($barSize - $filled)
+    $bar = ([string][char]9608 * $filled) + ([string][char]9617 * $empty)
     if ($Label) { Write-Host "  $bar  $Percent%  $Label" -ForegroundColor Yellow }
     else { Write-Host "  $bar  $Percent%" -ForegroundColor Yellow }
     Write-Host ""
@@ -66,6 +67,7 @@ function Show-FlagHeader {
 Show-FlagHeader
 Write-Log "Запуск Ukrainizator v$scriptVersion"
 #endregion
+
 #region === 1. Перевірка прав ===
 Show-FlagHeader
 Write-Step '*** Крок 1/9 ***' 'Перевірка прав адміністратора'
@@ -89,7 +91,7 @@ Write-Log "Версія PowerShell: $($PSVersionTable.PSVersion)" -Color Green
 
 #region === 3. Інтернет ===
 Show-FlagHeader
-Write-Step '*** Крок 3/9 ***' 'Перевірка підключення до Інтернету'
+Write-Step '*** Крок 3/9 ***' 'Перевірка підключення до інтернету'
 Show-ProgressBar -Percent 20 -Label 'Інтернет'
 Write-Host '  Перевірка...' -NoNewline
 $online = $false
@@ -99,7 +101,7 @@ try {
     try { Invoke-WebRequest -Uri 'https://www.microsoft.com' -UseBasicParsing -ErrorAction Stop | Out-Null; $online = $true } catch {}
 }
 if (-not $online) {
-    Write-ErrorExit 'Інтернет недоступний! Потрібне з''єднання для завантаження мовного пакета.'
+Write-ErrorExit "Інтернет недоступний! Потрібна з'єднання для завантаження мовного пакета."
 }
 Write-Host ' [OK]' -ForegroundColor Green
 Write-Host '  [OK] Інтернет доступний.' -ForegroundColor Green
@@ -126,27 +128,29 @@ if ($confirm -notin @('Y','y','Yes','YES','ok','OK','yep')) {
 Write-Host '  [OK] Продовжуємо...' -ForegroundColor Green
 Write-Log 'Користувач підтвердив виконання' -Color Green
 #endregion
+
 #region === 5. Вибір режиму встановлення ===
 Show-FlagHeader
 Write-Step '*** Крок 5/9 ***' 'Вибір режиму встановлення'
 Write-Host ''
 Write-Host '  Застосувати для:' -ForegroundColor Yellow
-Write-Host '    [A] Всіх користувачів (рекомендовано)' -ForegroundColor Cyan
-Write-Host '    [C] Тільки поточного користувача' -ForegroundColor Cyan
+Write-Host '    [A] усіх користувачів (рекомендовано)' -ForegroundColor Cyan
+Write-Host '    [C] тільки поточного користувача' -ForegroundColor Cyan
 Write-Host ''
 Write-Host '  Ваш вибір (A/C): ' -NoNewline -ForegroundColor Yellow
 $installMode = Read-Host
 if ($installMode -notin @('A','a','All','ALL')) {
     $installMode = 'Current'
-    Write-Host '  [i] Вибрано: Тільки поточний користувач.' -ForegroundColor Gray
-    Write-Log 'Вибрано режим: Тільки поточний користувач' -Color Gray
+    Write-Host '  [i] Вибрано: тільки поточний користувач.' -ForegroundColor Gray
+    Write-Log 'Вибрано режим: тільки поточний користувач' -Color Gray
 } else {
     $installMode = 'All'
-    Write-Host '  [OK] Вибрано: Всіх користувачів.' -ForegroundColor Green
-    Write-Log 'Вибрано режим: Всіх користувачів' -Color Green
+    Write-Host '  [OK] Вибрано: усіх користувачів.' -ForegroundColor Green
+    Write-Log 'Вибрано режим: усіх користувачів' -Color Green
 }
 Show-ProgressBar -Percent 45 -Label 'Режим вибрано'
 #endregion
+
 #region === 6. Модулі ===
 Show-FlagHeader
 Write-Step '*** Крок 6/9 ***' 'Перевірка системних модулів'
@@ -163,7 +167,9 @@ Write-Log 'Модуль LanguagePackManagement завантажено' -Color Gr
 Show-FlagHeader
 Write-Step '*** Крок 7/9 ***' 'Встановлення українського мовного пакета'
 Show-ProgressBar -Percent 65 -Label 'Мовний пакет'
-$ukUaInstalled = (Get-InstalledLanguage | Where-Object { $_.LanguageTag -eq 'uk-UA' })
+$ukUaInstalled = $false
+if ((Get-InstalledLanguage | Out-String) -match 'uk-UA') { $ukUaInstalled = $true }
+if (-not $ukUaInstalled) { if ((Get-WinUserLanguageList | Out-String) -match 'uk-UA') { $ukUaInstalled = $true } }
 if ($ukUaInstalled) {
     Write-Host '  [OK] uk-UA вже встановлено. Пропускаємо.' -ForegroundColor Yellow
     Write-Log 'uk-UA вже встановлено, пропускаємо' -Color Yellow
@@ -173,15 +179,23 @@ if ($ukUaInstalled) {
     Write-Log 'Початок встановлення uk-UA' -Color Yellow
     try {
         Install-Language -Language 'uk-UA' -CopyToSettings -ExcludeFeatures -ErrorAction Stop
-        $ukUaInstalled = (Get-InstalledLanguage | Where-Object { $_.LanguageTag -eq 'uk-UA' })
+        $ukUaInstalled = $false
+        for ($i = 1; $i -le 10; $i++) {
+            Start-Sleep -Seconds 3
+            if ((Get-InstalledLanguage | Out-String) -match 'uk-UA') { $ukUaInstalled = $true; break }
+            if ((Get-WinUserLanguageList | Out-String) -match 'uk-UA') { $ukUaInstalled = $true; break }
+        }
         if (-not $ukUaInstalled) { Write-ErrorExit 'uk-UA не знайдено після інсталяції. Перевірте систему.' }
         Write-Host '  [OK] Мовний пакет встановлено.' -ForegroundColor Green
         Write-Log 'uk-UA встановлено успішно' -Color Green
     } catch { Write-ErrorExit "Не вдалося встановити мову: $($_.Exception.Message)" }
     Show-ProgressBar -Percent 70 -Label 'Встановлено'
 }
+#endregion
 
-Write-Host '  Налаштування мови інтерфейсу...' -ForegroundColor Yellow
+#region === 8. Інтерфейс ===
+Show-FlagHeader
+Write-Step '*** Крок 8/9 ***' 'Налаштування мови інтерфейсу'
 try {
     Set-WinUILanguageOverride -Language 'uk-UA' -ErrorAction Stop
     Write-Host '  [OK] UI мову встановлено (після перезавантаження).' -ForegroundColor Green
@@ -191,19 +205,19 @@ try {
     Write-Host '  [OK] Реєстр Nls\Language: Default+InstallLanguage=0422 (uk-UA).' -ForegroundColor Green
     Write-Log 'Реєстр Nls\Language: 0422' -Color Green
     if ($installMode -eq 'All') {
-        Write-Host '  Копіювання на Welcome screen + нові користувачі...' -ForegroundColor Yellow
+        Write-Host '  Копіювання на Welcome screen + нових користувачів...' -ForegroundColor Yellow
         try {
             Copy-UserInternationalSettingsToSystem -WelcomeScreen $True -NewUser $True -ErrorAction Stop
-            Write-Host '  [OK] Скопійовано: Welcome screen + нові користувачі.' -ForegroundColor Green
+            Write-Host '  [OK] Скопійовано: Welcome screen + нових користувачів.' -ForegroundColor Green
             Write-Log 'Скопійовано: WelcomeScreen+NewUser' -Color Green
         } catch {
-            Write-Host "  [!] Copy-UserInternationalSettingsToSystem не спрацювало (можл. Win10): $($_.Exception.Message)" -ForegroundColor Yellow
+            Write-Host "  [!] Copy-UserInternationalSettingsToSystem не спрацювало (можливо Win10): $($_.Exception.Message)" -ForegroundColor Yellow
             Write-Log "Копіювання: $($_.Exception.Message)" -Color Yellow
         }
         Write-Host ''
-        Write-Host '  [!] Існуючі неактивні профілі НЕ змінені автоматично.' -ForegroundColor Red
+        Write-Host '  [!] Спеціальні налаштування профілю НЕ зміняться автоматично.' -ForegroundColor Red
         Write-Host '      Кожен користувач має увійти та налаштувати мову вручну.' -ForegroundColor Yellow
-        Write-Log 'Існуючі неактивні профілі не змінені' -Color Red
+        Write-Log 'Спеціальні налаштування профілю не змінено' -Color Red
     }
 } catch {
     Write-Host '  [!] Не вдалося налаштувати UI мову (некритично):' -ForegroundColor Yellow
@@ -212,9 +226,10 @@ try {
 }
 Show-ProgressBar -Percent 85 -Label 'Мова інтерфейсу'
 #endregion
-#region === 8. Розкладки ===
+
+#region === 9. Розкладки ===
 Show-FlagHeader
-Write-Step '*** Крок 8/9 ***' 'Налаштування розкладок клавіатури'
+Write-Step '*** Крок 9/9 ***' 'Налаштування розкладок клавіатури'
 Write-Host '  Встановлення: українська + англійська...' -ForegroundColor Yellow
 try {
     $ll = New-WinUserLanguageList 'uk-UA'
@@ -232,11 +247,11 @@ try {
 Show-ProgressBar -Percent 100 -Label 'Готово!'
 #endregion
 
-#region === 9. Завершення ===
+#region === Завершення ===
 Show-FlagHeader
 Write-Host ''
 Write-Host '============================================' -ForegroundColor Green
-Write-Host '   ВСІ КРОКИ ВИКОНАНО!' -ForegroundColor Yellow
+Write-Host '   ВСЕ МАЙЄ ВІКОНАННО!' -ForegroundColor Yellow
 Write-Host '============================================' -ForegroundColor Green
 $elapsed = (Get-Date) - $startTime
 Write-Host "Час: $($elapsed.Minutes)хв $($elapsed.Seconds)сек" -ForegroundColor Gray
@@ -252,7 +267,7 @@ if ($reboot -in @('Y','y','Yes','YES','ok','OK','yep')) {
 } else {
     Write-Host '  [i] Не забудьте перезавантажити пізніше.' -ForegroundColor Yellow
     Write-Host '  Дякуємо за використання Ukrainizator!' -ForegroundColor Cyan
-    Write-Log 'Користувач відклав перезавантаження' -Color Yellow
+    Write-Log 'Користувач відмовив перезавантаження' -Color Yellow
     pause
 }
 #endregion
