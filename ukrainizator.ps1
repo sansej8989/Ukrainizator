@@ -1,4 +1,4 @@
-﻿# Ukrainizator v3.2.0
+﻿# Ukrainizator v3.3.0
 # ============================================================
 # Встановлення української мови для Windows (Professional UI)
 # ============================================================
@@ -24,7 +24,7 @@ try {
 } catch {}
 
 #region === Settings & State ===
-$scriptVersion = '3.2.0'
+$scriptVersion = '3.3.0'
 Get-ChildItem -Path $PSScriptRoot -Filter 'Ukrainizator_*.log' -File | Remove-Item -Force
 $logFile = Join-Path $PSScriptRoot "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 $startTime = Get-Date
