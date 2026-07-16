@@ -1,4 +1,4 @@
-﻿# Ukrainizator v3.3.0
+# Ukrainizator v3.4.0
 # ============================================================
 # Встановлення української мови для Windows (Professional UI)
 # ============================================================
@@ -24,7 +24,7 @@ try {
 } catch {}
 
 #region === Settings & State ===
-$scriptVersion = '3.3.0'
+$scriptVersion = '3.4.0'
 Get-ChildItem -Path $PSScriptRoot -Filter 'Ukrainizator_*.log' -File | Remove-Item -Force
 $logFile = Join-Path $PSScriptRoot "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 $startTime = Get-Date
@@ -35,16 +35,18 @@ $global:steps = @(
     @{ id = 2;  name = 'Версія PowerShell';      status = 'pending'; result = '' },
     @{ id = 3;  name = 'Перевірка інтернету';   status = 'pending'; result = '' },
     @{ id = 4;  name = 'Підтвердження дій';    status = 'pending'; result = '' },
-    @{ id = 5;  name = 'Режим встановлення';      status = 'pending'; result = '' },
-    @{ id = 6;  name = 'Системні модулі';        status = 'pending'; result = '' },
-    @{ id = 7;  name = 'Мовний пакет uk-UA';     status = 'pending'; result = '' },
-    @{ id = 8;  name = 'Мова інтерфейсу';        status = 'pending'; result = '' },
-    @{ id = 9;  name = 'Розкладки клавіатури';  status = 'pending'; result = '' },
-    @{ id = 10; name = 'Оптимізація системи';    status = 'pending'; result = '' }
+    @{ id = 5;  name = 'Точка відновлення';      status = 'pending'; result = '' },
+    @{ id = 6;  name = 'Режим встановлення';      status = 'pending'; result = '' },
+    @{ id = 7;  name = 'Системні модулі';        status = 'pending'; result = '' },
+    @{ id = 8;  name = 'Мовний пакет uk-UA';     status = 'pending'; result = '' },
+    @{ id = 9;  name = 'Мова інтерфейсу';        status = 'pending'; result = '' },
+    @{ id = 10; name = 'Регіональні стандарти';  status = 'pending'; result = '' },
+    @{ id = 11; name = 'Дерусифікація та розкладки'; status = 'pending'; result = '' },
+    @{ id = 12; name = 'Оптимізація та перезапуск'; status = 'pending'; result = '' }
 )
 
 $global:uiHeaderHeight = 11
-$global:uiListHeight = 12
+$global:uiListHeight = 14
 #endregion
 
 #region === UI Functions ===
@@ -250,8 +252,28 @@ Set-StepStatus -id 4 -status 'success' -result 'Підтверджено'
 Write-Log 'Користувач підтвердив виконання' -Color Green
 #endregion
 
-#region === 5. Installation Mode Selection ===
+#region === 5. Restore Point ===
 Set-StepStatus -id 5 -status 'running'
+Show-ProgressBar -Percent 35 -Label 'Точка відновлення'
+Write-Log 'Створення точки відновлення...'
+try {
+    Enable-ComputerRestore -Drive "C:\" -ErrorAction SilentlyContinue
+    Checkpoint-Computer -Description "Перед запуском Ukrainizator" -RestorePointType MODIFY_SETTINGS -ErrorAction Stop
+    Set-StepStatus -id 5 -status 'success' -result 'Створено'
+    Write-Log 'Точку відновлення системи створено успішно' -Color Green
+} catch {
+    if ($_.Exception.Message -match "24") {
+        Set-StepStatus -id 5 -status 'success' -result 'Вже створено (<24г)'
+        Write-Log 'Точка відновлення вже створювалася менш ніж 24 години тому' -Color Green
+    } else {
+        Set-StepStatus -id 5 -status 'skipped' -result 'Пропущено'
+        Write-Log "Створення точки відновлення не вдалося: $($_.Exception.Message)" -Color Yellow
+    }
+}
+#endregion
+
+#region === 6. Installation Mode Selection ===
+Set-StepStatus -id 6 -status 'running'
 Show-ProgressBar -Percent 40 -Label 'Режим'
 Clear-ActivityZone
 [Console]::SetCursorPosition(0, $global:uiHeaderHeight + $global:uiListHeight + 2)
@@ -268,30 +290,30 @@ if ($installMode -notin @('A','a','All','ALL')) {
     $installMode = 'All'
     $modeText = 'Всі користувачі'
 }
-Set-StepStatus -id 5 -status 'success' -result $modeText
+Set-StepStatus -id 6 -status 'success' -result $modeText
 Write-Log "Вибрано режим: $modeText" -Color Green
 #endregion
 
-#region === 6. Modules ===
-Set-StepStatus -id 6 -status 'running'
+#region === 7. Modules ===
+Set-StepStatus -id 7 -status 'running'
 Show-ProgressBar -Percent 50 -Label 'Модулі'
 Import-Module LanguagePackManagement -ErrorAction SilentlyContinue
 if (-not (Get-Module -ListAvailable -Name LanguagePackManagement)) {
-    Write-ErrorExit 'Модуль LanguagePackManagement недоступний.' 6
+    Write-ErrorExit 'Модуль LanguagePackManagement недоступний.' 7
 }
-Set-StepStatus -id 6 -status 'success' -result 'Завантажено'
+Set-StepStatus -id 7 -status 'success' -result 'Завантажено'
 Write-Log 'Модуль LanguagePackManagement завантажено' -Color Green
 #endregion
 
-#region === 7. Language Pack ===
-Set-StepStatus -id 7 -status 'running'
+#region === 8. Language Pack ===
+Set-StepStatus -id 8 -status 'running'
 Show-ProgressBar -Percent 60 -Label 'Мовний пакет'
 $ukUaInstalled = $false
 if ((Get-InstalledLanguage | Out-String) -match 'uk-UA') { $ukUaInstalled = $true }
 if (-not $ukUaInstalled) { if ((Get-WinUserLanguageList | Out-String) -match 'uk-UA') { $ukUaInstalled = $true } }
 
 if ($ukUaInstalled) {
-    Set-StepStatus -id 7 -status 'skipped' -result 'Вже встановлено'
+    Set-StepStatus -id 8 -status 'skipped' -result 'Вже встановлено'
     Write-Log 'uk-UA вже встановлено, пропускаємо' -Color Yellow
 } else {
     Write-Log 'Встановлення uk-UA... (це може зайняти час)' -Color Yellow
@@ -303,16 +325,16 @@ if ($ukUaInstalled) {
             if ((Get-InstalledLanguage | Out-String) -match 'uk-UA') { $ukUaInstalled = $true; break }
             if ((Get-WinUserLanguageList | Out-String) -match 'uk-UA') { $ukUaInstalled = $true; break }
         }
-        if (-not $ukUaInstalled) { Write-ErrorExit 'uk-UA не знайдено після встановлення.' 7 }
-        Set-StepStatus -id 7 -status 'success' -result 'Встановлено'
+        if (-not $ukUaInstalled) { Write-ErrorExit 'uk-UA не знайдено після встановлення.' 8 }
+        Set-StepStatus -id 8 -status 'success' -result 'Встановлено'
         Write-Log 'uk-UA встановлено успішно' -Color Green
-    } catch { Write-ErrorExit "Помилка встановлення: $($_.Exception.Message)" 7 }
+    } catch { Write-ErrorExit "Помилка встановлення: $($_.Exception.Message)" 8 }
 }
 #endregion
 
-#region === 8. Interface ===
-Set-StepStatus -id 8 -status 'running'
-Show-ProgressBar -Percent 75 -Label 'Інтерфейс'
+#region === 9. Interface ===
+Set-StepStatus -id 9 -status 'running'
+Show-ProgressBar -Percent 70 -Label 'Інтерфейс'
 try {
     Set-WinUILanguageOverride -Language 'uk-UA' -ErrorAction Stop
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\Language' -Name 'Default' -Value '0422' -ErrorAction Stop
@@ -326,19 +348,42 @@ try {
             Write-Log "Копіювання налаштувань не вдалося (Win10)" -Color Yellow
         }
     }
-    Set-StepStatus -id 8 -status 'success' -result 'uk-UA встановлено'
+    Set-StepStatus -id 9 -status 'success' -result 'uk-UA встановлено'
     Write-Log 'Мова інтерфейсу встановлена' -Color Green
 } catch {
-    Set-StepStatus -id 8 -status 'skipped' -result 'Частково'
+    Set-StepStatus -id 9 -status 'skipped' -result 'Частково'
     Write-Log "Мова інтерфейсу: $($_.Exception.Message)" -Color Yellow
 }
 #endregion
 
-#region === 9. Layouts ===
-Set-StepStatus -id 9 -status 'running'
-Show-ProgressBar -Percent 85 -Label 'Розкладки'
+#region === 10. Regional Formats ===
+Set-StepStatus -id 10 -status 'running'
+Show-ProgressBar -Percent 80 -Label 'Регіональні формати'
 try {
-    # Виправлення: створення списку з однією мовою, потім додавання іншої
+    Set-Culture -CultureInfo 'uk-UA' -ErrorAction Stop
+    Set-WinSystemLocale -SystemLocale 'uk-UA' -ErrorAction Stop
+    Set-WinHomeLocation -GeoId 240 -ErrorAction Stop
+    Set-StepStatus -id 10 -status 'success' -result 'uk-UA (Україна)'
+    Write-Log 'Регіональні стандарти встановлено на uk-UA' -Color Green
+} catch {
+    Set-StepStatus -id 10 -status 'skipped' -result 'Частково'
+    Write-Log "Помилка регіональних форматів: $($_.Exception.Message)" -Color Yellow
+}
+#endregion
+
+#region === 11. Derussification & Layouts ===
+Set-StepStatus -id 11 -status 'running'
+Show-ProgressBar -Percent 90 -Label 'Розкладки'
+try {
+    # Дерусифікація: Отримуємо поточний список мов та примусово видаляємо російську мову
+    $list = Get-WinUserLanguageList
+    $ruLanguages = $list | Where-Object { $_.LanguageTag -match 'ru' }
+    foreach ($ruLang in $ruLanguages) {
+        $list.Remove($ruLang)
+        Write-Log "Видалено російську мову зі списку: $($ruLang.LanguageTag)" -Color Yellow
+    }
+    
+    # Створюємо чистий список мов: тільки українська та англійська
     $ll = New-WinUserLanguageList -Language 'uk-UA'
     $ll.Add('en-US')
     
@@ -349,35 +394,64 @@ try {
     
     Set-WinUserLanguageList -LanguageList $ll -Force -ErrorAction Stop
     
+    # Видалення російської розкладки з налаштувань за замовчуванням
+    $preloadPath = 'HKCU:\Keyboard Layout\Preload'
+    if (Test-Path $preloadPath) {
+        $preloads = Get-ItemProperty -Path $preloadPath
+        foreach ($prop in $preloads.PSObject.Properties) {
+            if ($prop.Value -eq '00000419') {
+                Remove-ItemProperty -Path $preloadPath -Name $prop.Name -Force -ErrorAction SilentlyContinue
+                Write-Log "Видалено російську розкладку з автозавантаження розкладок" -Color Yellow
+            }
+        }
+    }
+    
     $togglePath = 'HKCU:\Keyboard Layout\Toggle'
     if (-not (Test-Path $togglePath)) { New-Item -Path $togglePath -Force | Out-Null }
     Set-ItemProperty -Path $togglePath -Name 'Hotkey' -Value 1 -ErrorAction Stop
     
-    Set-StepStatus -id 9 -status 'success' -result 'UKR+ENG (Shift+Alt)'
-    Write-Log 'Розкладки та гарячі клавіші встановлено' -Color Green
+    Set-StepStatus -id 11 -status 'success' -result 'UKR+ENG (без RU)'
+    Write-Log 'Дерусифікацію виконано, розкладки встановлено (Shift+Alt)' -Color Green
 } catch {
-    Set-StepStatus -id 9 -status 'skipped' -result 'Помилка'
-    Write-Log "Помилка Layouts: $($_.Exception.Message)" -Color Yellow
+    Set-StepStatus -id 11 -status 'skipped' -result 'Помилка'
+    Write-Log "Помилка дерусифікації/розкладок: $($_.Exception.Message)" -Color Yellow
 }
 #endregion
 
-#region === 10. Optimizations ===
-Set-StepStatus -id 10 -status 'running'
+#region === 12. Optimizations & Explorer Restart ===
+Set-StepStatus -id 12 -status 'running'
 Show-ProgressBar -Percent 95 -Label 'Оптимізація'
 $optSuccess = $true
 try { Set-ItemProperty -Path 'HKU:\.DEFAULT\Control Panel\Keyboard' -Name 'InitialKeyboardIndicators' -Value '80000002' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
 try { Set-ItemProperty -Path 'HKCU:\Control Panel\Accessibility\StickyKeys' -Name 'Flags' -Value '510' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
-try { Set-WinSystemLocale -SystemLocale 'uk-UA' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
-try { Set-WinHomeLocation -GeoId 240 -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
 try { Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'MenuShowDelay' -Value '20' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
 try { Set-ItemProperty -Path 'HKCU:\Control Panel\Sound' -Name 'Beep' -Value 'no' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
 
+# Очищення кешу шрифтів
+try {
+    Stop-Service -Name "FontCache" -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path "$env:windir\ServiceProfiles\LocalService\AppData\Local\FontCache\*.dat" -Force -ErrorAction SilentlyContinue
+    Start-Service -Name "FontCache" -ErrorAction SilentlyContinue
+    Write-Log 'Кеш шрифтів очищено' -Color Green
+} catch {
+    Write-Log 'Не вдалося очистити кеш шрифтів, пропущено' -Color Yellow
+}
+
+# Перезапуск провідника (Explorer)
+try {
+    Write-Log 'Перезапуск провідника (explorer.exe)...'
+    Stop-Process -Name explorer -Force
+    Start-Sleep -Seconds 1
+} catch {
+    Write-Log 'Не вдалося перезапустити провідник' -Color Yellow
+}
+
 if ($optSuccess) {
-    Set-StepStatus -id 10 -status 'success' -result 'Застосовано'
-    Write-Log 'Системні оптимізації виконано' -Color Green
+    Set-StepStatus -id 12 -status 'success' -result 'Застосовано + Перезапуск'
+    Write-Log 'Оптимізації та перезапуск провідника виконано' -Color Green
 } else {
-    Set-StepStatus -id 10 -status 'skipped' -result 'Частково'
-    Write-Log 'Деякі системні оптимізації не вдалися' -Color Yellow
+    Set-StepStatus -id 12 -status 'skipped' -result 'Частково'
+    Write-Log 'Деякі оптимізації не виконано' -Color Yellow
 }
 #endregion
 
