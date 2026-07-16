@@ -1,7 +1,14 @@
-﻿# Ukrainizator v3.4.0
+# Ukrainizator v4.0.0
 # ============================================================
 # Встановлення української мови для Windows (Professional UI)
 # ============================================================
+
+param(
+    [switch]$Silent,
+    [ValidateSet('All', 'Current')]
+    [string]$Mode = 'All',
+    [switch]$NoRebootPrompt
+)
 
 # Встановлення UTF-8 та підтримки кирилиці
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -24,7 +31,7 @@ try {
 } catch {}
 
 #region === Settings & State ===
-$scriptVersion = '3.4.0'
+$scriptVersion = '4.0.0'
 Get-ChildItem -Path $PSScriptRoot -Filter 'Ukrainizator_*.log' -File | Remove-Item -Force
 $logFile = Join-Path $PSScriptRoot "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 $startTime = Get-Date
@@ -241,15 +248,20 @@ Write-Host '  УВАГА: Скрипт змінює системну мову т
 Write-Host '  Після завершення потрібне перезавантаження.' -ForegroundColor Red
 Write-Host '  РЕКОМЕНДУЄМО СТВОРИТИ ТОЧКУ ВІДНОВЛЕННЯ.' -ForegroundColor Yellow
 Write-Host ''
-Write-Host '  Продовжити? (Y/N): ' -NoNewline -ForegroundColor Yellow
-$confirm = Read-HostWithDefault -Default 'Y'
-if ($confirm -notin @('Y','y','Yes','YES','ok','OK','yep')) {
-    Set-StepStatus -id 4 -status 'error' -result 'Скасовано'
-    Write-Log 'Скасовано користувачем' -Color Red
-    exit 1
+if ($Silent) {
+    Set-StepStatus -id 4 -status 'success' -result 'Авто'
+    Write-Log 'Підтвердження пропущено через Silent-режим' -Color Green
+} else {
+    Write-Host '  Продовжити? (Y/N): ' -NoNewline -ForegroundColor Yellow
+    $confirm = Read-HostWithDefault -Default 'Y'
+    if ($confirm -notin @('Y','y','Yes','YES','ok','OK','yep')) {
+        Set-StepStatus -id 4 -status 'error' -result 'Скасовано'
+        Write-Log 'Скасовано користувачем' -Color Red
+        exit 1
+    }
+    Set-StepStatus -id 4 -status 'success' -result 'Підтверджено'
+    Write-Log 'Користувач підтвердив виконання' -Color Green
 }
-Set-StepStatus -id 4 -status 'success' -result 'Підтверджено'
-Write-Log 'Користувач підтвердив виконання' -Color Green
 #endregion
 
 #region === 5. Restore Point ===
@@ -277,21 +289,28 @@ Set-StepStatus -id 6 -status 'running'
 Show-ProgressBar -Percent 40 -Label 'Режим'
 Clear-ActivityZone
 [Console]::SetCursorPosition(0, $global:uiHeaderHeight + $global:uiListHeight + 2)
-Write-Host '  Застосувати до:' -ForegroundColor Yellow
-Write-Host '    [A] всіх користувачів (рекомендовано)' -ForegroundColor Cyan
-Write-Host '    [C] тільки поточного користувача' -ForegroundColor Cyan
-Write-Host ''
-Write-Host '  Ваш вибір (A/C): ' -NoNewline -ForegroundColor Yellow
-$installMode = Read-HostWithDefault -Default 'A'
-if ($installMode -notin @('A','a','All','ALL')) {
-    $installMode = 'Current'
-    $modeText = 'Поточний користувач'
+if ($Silent) {
+    $installMode = $Mode
+    $modeText = if ($Mode -eq 'All') { 'Всі користувачі (авто)' } else { 'Поточний користувач (авто)' }
+    Set-StepStatus -id 6 -status 'success' -result $modeText
+    Write-Log "Silent-режим: вибрано $modeText" -Color Green
 } else {
-    $installMode = 'All'
-    $modeText = 'Всі користувачі'
+    Write-Host '  Застосувати до:' -ForegroundColor Yellow
+    Write-Host '    [A] всіх користувачів (рекомендовано)' -ForegroundColor Cyan
+    Write-Host '    [C] тільки поточного користувача' -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '  Ваш вибір (A/C): ' -NoNewline -ForegroundColor Yellow
+    $installMode = Read-HostWithDefault -Default 'A'
+    if ($installMode -notin @('A','a','All','ALL')) {
+        $installMode = 'Current'
+        $modeText = 'Поточний користувач'
+    } else {
+        $installMode = 'All'
+        $modeText = 'Всі користувачі'
+    }
+    Set-StepStatus -id 6 -status 'success' -result $modeText
+    Write-Log "Вибрано режим: $modeText" -Color Green
 }
-Set-StepStatus -id 6 -status 'success' -result $modeText
-Write-Log "Вибрано режим: $modeText" -Color Green
 #endregion
 
 #region === 7. Modules ===
@@ -473,16 +492,23 @@ $elapsed = (Get-Date) - $startTime
 Write-Host "Час: $($elapsed.Minutes)хв $($elapsed.Seconds)сек" -ForegroundColor Gray
 Write-Host "Лог: $logFile" -ForegroundColor Gray
 Write-Host ''
-Write-Host 'Перезавантажити зараз? (Y/N): ' -NoNewline -ForegroundColor Yellow
-$reboot = Read-HostWithDefault -Default 'Y'
-if ($reboot -in @('Y','y','Yes','YES','ok','OK','yep')) {
-    Write-Host '  Перезавантаження... До зустрічі!' -ForegroundColor Green
-    Write-Log 'Запитується перезавантаження' -Color Green
+if ($NoRebootPrompt) {
+    Write-Host '  Перезавантаження...' -ForegroundColor Green
+    Write-Log 'Автоперезавантаження через NoRebootPrompt' -Color Green
     Start-Sleep -Seconds 2
     Restart-Computer
 } else {
-    Write-Host '  [i] Не забудьте перезавантажити комп''ютер пізніше.' -ForegroundColor Yellow
-    Write-Host '  Дякуємо за використання Ukrainizator!' -ForegroundColor Cyan
-    Write-Log 'Користувач відмовився від перезавантаження' -Color Yellow
-    pause
+    Write-Host 'Перезавантажити зараз? (Y/N): ' -NoNewline -ForegroundColor Yellow
+    $reboot = Read-HostWithDefault -Default 'Y'
+    if ($reboot -in @('Y','y','Yes','YES','ok','OK','yep')) {
+        Write-Host '  Перезавантаження... До зустрічі!' -ForegroundColor Green
+        Write-Log 'Запитується перезавантаження' -Color Green
+        Start-Sleep -Seconds 2
+        Restart-Computer
+    } else {
+        Write-Host '  [i] Не забудьте перезавантажити комп''ютер пізніше.' -ForegroundColor Yellow
+        Write-Host '  Дякуємо за використання Ukrainizator!' -ForegroundColor Cyan
+        Write-Log 'Користувач відмовився від перезавантаження' -Color Yellow
+        pause
+    }
 }
