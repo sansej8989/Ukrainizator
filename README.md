@@ -142,7 +142,6 @@ powershell -ExecutionPolicy Bypass -File .\ukrainizator.ps1 -Silent -Mode Curren
 | `ukrainizator.ps1` | основний PowerShell-скрипт |
 | `run-manual.bat` | ручний запуск з підказками |
 | `run-auto.bat` | автоматичний запуск |
-| `run.bat` | сумісний ручний запуск |
 | `README.md` | документація проєкту |
 
 ---
