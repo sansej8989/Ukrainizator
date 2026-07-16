@@ -325,14 +325,7 @@ Set-StepStatus -id 10 -status 'running'
 Show-ProgressBar -Percent 95 -Label 'Оптимізація'
 $optSuccess = $true
 try { Set-ItemProperty -Path 'HKU:\.DEFAULT\Control Panel\Keyboard' -Name 'InitialKeyboardIndicators' -Value '80000002' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
-try { Set-ItemProperty -Path 'HKCU:\Control Panel\Accessibility\StickyKeys' -Name 'Flags' -Value '506' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
-try {
-    $kbRespPath = 'HKCU:\Control Panel\Accessibility\Keyboard Response'
-    if (-not (Test-Path $kbRespPath)) { New-Item -Path $kbRespPath -Force | Out-Null }
-    Set-ItemProperty -Path $kbRespPath -Name 'AutoRepeatDelay' -Value '200' -ErrorAction SilentlyContinue
-    Set-ItemProperty -Path $kbRespPath -Name 'AutoRepeatRate' -Value '15' -ErrorAction SilentlyContinue
-    Set-ItemProperty -Path $kbRespPath -Name 'Flags' -Value '27' -ErrorAction SilentlyContinue
-} catch { $optSuccess = $false }
+try { Set-ItemProperty -Path 'HKCU:\Control Panel\Accessibility\StickyKeys' -Name 'Flags' -Value '510' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
 try { Set-WinSystemLocale -SystemLocale 'uk-UA' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
 try { Set-WinHomeLocation -GeoId 240 -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
 try { Set-ItemProperty -Path 'HKCU:\Control Panel\Desktop' -Name 'MenuShowDelay' -Value '20' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
