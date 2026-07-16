@@ -1,6 +1,6 @@
 @echo off
 cd /d "%~dp0"
-title Ukrainizator
+title Ukrainizator - Manual
 
 :: Auto elevate to admin
 net session >nul 2>&1
