@@ -1,11 +1,11 @@
-# 🇺🇦 Ukrainizator v4.0.0
+# 🇺🇦 Ukrainizator v4.0.1
 ### Windows, але по-українськи — красиво, швидко і без зайвого болю
 
 ![GitHub](https://img.shields.io/github/license/sansej8989/Ukrainizator)
 ![GitHub stars](https://img.shields.io/github/stars/sansej8989/Ukrainizator?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/sansej8989/Ukrainizator?style=social)
 ![GitHub issues](https://img.shields.io/github/issues/sansej8989/Ukrainizator)
-![Version](https://img.shields.io/badge/version-4.0.0-blue)
+![Version](https://img.shields.io/badge/version-4.0.1-blue)
 ![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blueviolet)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue)
 
@@ -163,6 +163,11 @@ powershell -ExecutionPolicy Bypass -File .\ukrainizator.ps1 -Silent -Mode Curren
 ---
 
 ## 📝 Changelog
+
+### v4.0.1
+- Виправлено дублювання виводу UI
+- Реалізовано динамічне налаштування розміру вікна консолі
+- Виправлено дублювання виводу логу
 
 ### v4.0.0
 - додано `-Silent`, `-Mode`, `-NoRebootPrompt`
