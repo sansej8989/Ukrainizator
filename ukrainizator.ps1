@@ -7,8 +7,35 @@ param(
     [switch]$Silent,
     [ValidateSet('All', 'Current')]
     [string]$Mode = 'All',
-    [switch]$NoRebootPrompt
+    [switch]$NoRebootPrompt,
+    [switch]$Force,           # Пропустити швидку перевірку "вже налаштовано" і виконати все заново
+    [switch]$Revert,          # Відкотити налаштування з останнього резервного знімку
+    [switch]$WhatIf,          # Показати, що БУЛО Б зроблено, нічого не змінюючи
+    [string[]]$ComputerName,  # Список віддалених машин для запуску (замість локального виконання)
+    [System.Management.Automation.PSCredential]$Credential
 )
+
+# --- Віддалене розгортання на список машин (якщо вказано -ComputerName) ---
+# Локальна машина в цьому режимі нічого сама не змінює - лише копіює скрипт
+# на кожну віддалену машину і запускає його там через PS Remoting.
+if ($ComputerName -and $ComputerName.Count -gt 0) {
+    Write-Host ''
+    Write-Host "  Віддалений запуск Українізатора на $($ComputerName.Count) машин(і)..." -ForegroundColor Cyan
+    try {
+        Invoke-Command -ComputerName $ComputerName -Credential $Credential -ErrorAction Stop -ScriptBlock {
+            param($ScriptContent, $ModeArg)
+            $tempPath = Join-Path $env:TEMP "Ukrainizator_remote_$(Get-Random).ps1"
+            Set-Content -Path $tempPath -Value $ScriptContent -Encoding UTF8
+            & powershell.exe -ExecutionPolicy Bypass -NoProfile -File $tempPath -Silent -Mode $ModeArg -NoRebootPrompt
+            Remove-Item $tempPath -Force -ErrorAction SilentlyContinue
+        } -ArgumentList (Get-Content -Path $PSCommandPath -Raw), $Mode
+        Write-Host "  Готово. Перевірте лог-файли на кожній машині (у теці скрипта, %TEMP% на віддаленій)." -ForegroundColor Green
+    } catch {
+        Write-Host "  Помилка віддаленого запуску: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "  Переконайтесь, що на віддалених машинах увімкнено PS Remoting (Enable-PSRemoting) і є мережевий доступ." -ForegroundColor DarkYellow
+    }
+    exit 0
+}
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 [Console]::InputEncoding  = [System.Text.Encoding]::UTF8
@@ -27,6 +54,51 @@ function Write-DebugLog {
 }
 
 Write-DebugLog "Script started."
+
+#region === Перевірка цілісності скрипта ===
+# Справжній Authenticode-підпис вимагає сертифіката (або платного від довіреного
+# центру сертифікації, або самопідписаного - але самопідписаний довіряється лише
+# тим машинам, куди ви вручну імпортували його у сховище "Trusted Publishers").
+# Для одного скрипта на кількох власних машинах простіший і цілком робочий варіант -
+# звичайний хеш SHA-256: поруч зі скриптом лежить файл ukrainizator.ps1.sha256
+# з очікуваним хешем; якщо вміст скрипта хоч трохи змінили (пошкодження при
+# копіюванні, чиєсь втручання) - хеш не збіжиться і скрипт попередить про це.
+function Test-ScriptIntegrity {
+    $scriptPath = $PSCommandPath
+    if (-not $scriptPath -or -not (Test-Path $scriptPath)) { return $true }
+    $hashFile = "$scriptPath.sha256"
+    if (-not (Test-Path $hashFile)) {
+        Write-DebugLog "Файл контрольної суми не знайдено ($hashFile) - перевірка цілісності пропущена."
+        return $true
+    }
+    try {
+        $expected = (Get-Content -Path $hashFile -Raw).Trim().ToUpper()
+        $actual = (Get-FileHash -Path $scriptPath -Algorithm SHA256).Hash.ToUpper()
+        if ($expected -ne $actual) {
+            Write-Host ''
+            Write-Host '  ============================================' -ForegroundColor Red
+            Write-Host '  УВАГА: контрольна сума скрипта НЕ збігається!' -ForegroundColor Red
+            Write-Host '  Файл могли пошкодити або змінити після підпису.' -ForegroundColor Red
+            Write-Host "  Очікувано: $expected" -ForegroundColor DarkGray
+            Write-Host "  Отримано:  $actual" -ForegroundColor DarkGray
+            Write-Host '  ============================================' -ForegroundColor Red
+            $ans = Read-Host '  Продовжити виконання попри це? (y/N)'
+            if ($ans -notin @('y', 'Y', 'yes', 'Yes')) {
+                Write-Host '  Виконання зупинено користувачем.' -ForegroundColor Yellow
+                exit 1
+            }
+        }
+    } catch {
+        Write-DebugLog "Не вдалося перевірити цілісність: $($_.Exception.Message)"
+    }
+    return $true
+}
+
+# Щоб (пере)згенерувати файл контрольної суми після легітимного редагування
+# скрипта, виконайте окремо в PowerShell:
+#   (Get-FileHash -Path .\ukrainizator.ps1 -Algorithm SHA256).Hash | Set-Content .\ukrainizator.ps1.sha256
+Test-ScriptIntegrity | Out-Null
+#endregion
 
 try {
     cmd /c chcp 65001 | Out-Null
@@ -107,6 +179,13 @@ Get-ChildItem -Path $PSScriptRoot -Filter 'Ukrainizator_*.log' -File -ErrorActio
 $logFile = Join-Path $PSScriptRoot "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 $startTime = Get-Date
 $global:steps = @()
+$global:FailedSteps = New-Object System.Collections.ArrayList   # для "продовжити після помилки" - підсумок наприкінці
+$global:BackupData = [ordered]@{}                                # знімок налаштувань "до" - для -Revert
+
+function Add-StepIssue {
+    param([int]$id, [string]$name, [string]$message)
+    [void]$global:FailedSteps.Add([pscustomobject]@{ Id = $id; Name = $name; Message = $message })
+}
 #endregion
 
 #region === Modern UI Engine (ANSI / VT, no fixed console geometry needed) ===
@@ -548,6 +627,37 @@ function Show-CompletionBanner {
 }
 #endregion
 
+#region === Швидка перевірка "вже налаштовано" (idempotency) ===
+function Test-AlreadyUkrainized {
+    try {
+        $sysLocale = (Get-WinSystemLocale).Name
+        $uiOverride = (Get-WinUILanguageOverride -ErrorAction SilentlyContinue).Name
+        $langList = Get-WinUserLanguageList
+        $hasUk = $langList | Where-Object { $_.LanguageTag -eq 'uk-UA' }
+        $hasRu = $langList | Where-Object { $_.LanguageTag -match 'ru' }
+        $geoId = (Get-WinHomeLocation -ErrorAction SilentlyContinue).GeoId
+        return ($sysLocale -eq 'uk-UA' -and $uiOverride -eq 'uk-UA' -and $hasUk -and (-not $hasRu) -and $geoId -eq 240)
+    } catch {
+        return $false
+    }
+}
+function Show-CountdownReboot {
+    param([int]$Seconds = 15)
+    for ($s = $Seconds; $s -gt 0; $s--) {
+        Set-InfoPanel -Lines @("$(Get-LocalizedMessage 'rebooting') Перезавантаження через $s с... (натисніть будь-яку клавішу, щоб скасувати)")
+        try {
+            if ([Console]::KeyAvailable) {
+                [Console]::ReadKey($true) | Out-Null
+                return $false
+            }
+        } catch {}
+        Start-Sleep -Seconds 1
+    }
+    return $true
+}
+
+#endregion
+
 # === Bootstrap ===
 Initialize-UI
 if ($global:UseAnsi) {
@@ -570,6 +680,67 @@ if (-not (Read-LocalizationFile $global:CurrentLanguage)) {
     }
 }
 
+#region === Відкат (-Revert) ===
+if ($Revert) {
+    Write-Log 'Запущено режим відкату (-Revert)' -Color DarkYellow
+    $backupPattern = Join-Path $PSScriptRoot 'Ukrainizator_backup_*.json'
+    $lastBackup = Get-ChildItem -Path $backupPattern -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    if (-not $lastBackup) {
+        Set-InfoPanel -Style 'Error' -Lines @('Резервний знімок не знайдено.', 'Відкат можливий лише після хоча б одного звичайного запуску скрипта.')
+        Write-Log 'Відкат неможливий: файл резервної копії не знайдено' -Color Red
+        Write-Host ''
+        Write-Host '  Натисніть будь-яку клавішу, щоб завершити...' -ForegroundColor Gray
+        $null = [Console]::ReadKey($true)
+        Restore-Console
+        exit 1
+    }
+    try {
+        $bk = Get-Content -Path $lastBackup.FullName -Raw | ConvertFrom-Json
+        Set-InfoPanel -Lines @(
+            "Знайдено знімок від $($lastBackup.LastWriteTime)",
+            "Буде відновлено: SystemLocale=$($bk.SystemLocale), UILanguage=$($bk.UILanguage), Culture=$($bk.Culture)"
+        )
+        $go = Show-Prompt -Text 'Відновити ці налаштування? (Y/N)' -Default 'Y'
+        if ($go -notin @('Y','y','Yes','YES')) {
+            Write-Log 'Відкат скасовано користувачем' -Color DarkYellow
+            Restore-Console
+            exit 0
+        }
+        if (-not $WhatIf) {
+            if ($bk.SystemLocale) { Set-WinSystemLocale -SystemLocale $bk.SystemLocale -ErrorAction SilentlyContinue }
+            if ($bk.Culture)      { Set-Culture -CultureInfo $bk.Culture -ErrorAction SilentlyContinue }
+            if ($bk.UILanguage)   { Set-WinUILanguageOverride -Language $bk.UILanguage -ErrorAction SilentlyContinue }
+            if ($bk.GeoId)        { Set-WinHomeLocation -GeoId $bk.GeoId -ErrorAction SilentlyContinue }
+            if ($bk.LanguageList) {
+                try {
+                    $ll = New-WinUserLanguageList -Language $bk.LanguageList[0]
+                    for ($i = 1; $i -lt $bk.LanguageList.Count; $i++) { $ll.Add($bk.LanguageList[$i]) }
+                    Set-WinUserLanguageList -LanguageList $ll -Force -ErrorAction SilentlyContinue
+                } catch {}
+            }
+            Write-Log 'Попередні налаштування відновлено' -Color DarkGreen
+        } else {
+            Write-Log '[WhatIf] Відкат НЕ виконано (лише перегляд)' -Color DarkYellow
+        }
+        Clear-InfoPanel
+        Show-CompletionBanner
+        Restore-Console
+        Write-Host ''
+        Write-Host '  Рекомендується перезавантажити комп''ютер, щоб зміни набули чинності.' -ForegroundColor DarkYellow
+        Write-Host '  Натисніть будь-яку клавішу, щоб завершити...' -ForegroundColor Gray
+        $null = [Console]::ReadKey($true)
+        exit 0
+    } catch {
+        Write-Host ''
+        Write-Host "  Не вдалося прочитати резервну копію: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host '  Натисніть будь-яку клавішу, щоб завершити...' -ForegroundColor Gray
+        $null = [Console]::ReadKey($true)
+        Restore-Console
+        exit 1
+    }
+}
+#endregion
+
 # Ініціалізація кроків після завантаження мови
 $global:steps = @(
     @{ id = 1;  name = (Get-LocalizedMessage 'admin_rights_check');         status = 'pending'; result = ''; details = '' },
@@ -582,11 +753,61 @@ $global:steps = @(
     @{ id = 8;  name = (Get-LocalizedMessage 'interface_language_setting'); status = 'pending'; result = ''; details = '' },
     @{ id = 9;  name = (Get-LocalizedMessage 'regional_formats_setting');   status = 'pending'; result = ''; details = '' },
     @{ id = 10; name = (Get-LocalizedMessage 'derussification_layouts');    status = 'pending'; result = ''; details = '' },
-    @{ id = 11; name = (Get-LocalizedMessage 'optimizations_restart');      status = 'pending'; result = ''; details = '' }
+    @{ id = 11; name = (Get-LocalizedMessage 'optimizations_restart');      status = 'pending'; result = ''; details = '' },
+    @{ id = 12; name = 'Перевірка результату';                              status = 'pending'; result = ''; details = '' }
 )
 
 Render-UI
 Write-Log "$(Get-LocalizedMessage 'starting_ukrainizator') v$scriptVersion"
+if ($WhatIf) { Write-Log '[WhatIf] Режим попереднього перегляду: жодних реальних змін внесено НЕ буде' -Color DarkYellow }
+
+#region === 0. Швидка перевірка "вже налаштовано" ===
+if (-not $Force -and -not $WhatIf) {
+    if (Test-AlreadyUkrainized) {
+        Set-InfoPanel -Lines @(
+            'Схоже, систему вже повністю українізовано (мова, регіон, розкладки).',
+            'Повторний повний прогін не обов''язковий.'
+        )
+        Write-Log 'Швидка перевірка: система вже налаштована' -Color DarkGreen
+        if ($Silent) {
+            Write-Log 'Тихий режим: завершення без повторної обробки (додайте -Force для примусового повтору)' -Color DarkGreen
+            Restore-Console
+            exit 0
+        }
+        $again = Show-Prompt -Text 'Все одно виконати повний прогін ще раз? (y/N)' -Default 'N'
+        if ($again -notin @('Y','y','Yes','YES')) {
+            Clear-InfoPanel
+            Write-Log 'Користувач підтвердив, що повторна обробка не потрібна' -Color DarkGreen
+            Restore-Console
+            exit 0
+        }
+        Clear-InfoPanel
+    }
+}
+#endregion
+
+#region === Резервний знімок поточних налаштувань (для -Revert) ===
+if (-not $WhatIf) {
+    try {
+        $backupObj = [ordered]@{
+            Timestamp     = (Get-Date).ToString('o')
+            SystemLocale  = (Get-WinSystemLocale -ErrorAction SilentlyContinue).Name
+            UILanguage    = (Get-WinUILanguageOverride -ErrorAction SilentlyContinue).Name
+            Culture       = (Get-Culture).Name
+            GeoId         = (Get-WinHomeLocation -ErrorAction SilentlyContinue).GeoId
+            LanguageList  = @((Get-WinUserLanguageList | ForEach-Object { $_.LanguageTag }))
+        }
+        $backupFile = Join-Path $PSScriptRoot "Ukrainizator_backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
+        $backupObj | ConvertTo-Json | Set-Content -Path $backupFile -Encoding UTF8
+        # Лишаємо тільки 5 останніх знімків, щоб не смітити теку
+        Get-ChildItem -Path (Join-Path $PSScriptRoot 'Ukrainizator_backup_*.json') -File -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -Skip 5 | Remove-Item -Force -ErrorAction SilentlyContinue
+        Write-Log "Резервний знімок налаштувань збережено: $(Split-Path $backupFile -Leaf) (для відкату: -Revert)" -Color DarkGreen
+    } catch {
+        Write-Log "Не вдалося зберегти резервний знімок: $($_.Exception.Message)" -Color DarkYellow
+    }
+}
+#endregion
 
 #region === 1. Privilege Check ===
 Set-StepStatus -id 1 -status 'running'
@@ -632,6 +853,10 @@ Clear-InfoPanel
 #region === 4. Restore Point ===
 Set-StepStatus -id 4 -status 'running'
 Show-ProgressBar -Percent 30 -Label (Get-LocalizedMessage 'restore_point')
+if ($WhatIf) {
+    Set-StepStatus -id 4 -status 'skipped' -result '[WhatIf]'
+    Write-Log '[WhatIf] Було б створено точку відновлення' -Color DarkYellow
+} else {
 Write-Log (Get-LocalizedMessage 'restore_point_creation')
 try {
     Enable-ComputerRestore -Drive "C:\" -ErrorAction SilentlyContinue
@@ -644,8 +869,10 @@ try {
         Write-Log (Get-LocalizedMessage 'restore_point_already_created') -Color DarkGreen
     } else {
         Set-StepStatus -id 4 -status 'skipped' -result (Get-LocalizedMessage 'skipped')
+        Add-StepIssue -id 4 -name (Get-LocalizedMessage 'restore_point') -message $_.Exception.Message
         Write-Log "$(Get-LocalizedMessage 'restore_point_failed')$($_.Exception.Message)" -Color DarkYellow
     }
+}
 }
 #endregion
 
@@ -682,10 +909,13 @@ Set-StepStatus -id 6 -status 'running'
 Show-ProgressBar -Percent 50 -Label (Get-LocalizedMessage 'modules_check')
 Import-Module LanguagePackManagement -ErrorAction SilentlyContinue
 if (-not (Get-Module -ListAvailable -Name LanguagePackManagement)) {
-    Write-ErrorExit (Get-LocalizedMessage 'languagemanagement_not_available') 6
+    Set-StepStatus -id 6 -status 'skipped' -result 'Модуль недоступний'
+    Add-StepIssue -id 6 -name (Get-LocalizedMessage 'modules_check') -message (Get-LocalizedMessage 'languagemanagement_not_available')
+    Write-Log (Get-LocalizedMessage 'languagemanagement_not_available') -Color DarkYellow
+} else {
+    Set-StepStatus -id 6 -status 'success' -result (Get-LocalizedMessage 'loaded')
+    Write-Log (Get-LocalizedMessage 'languagemanagement_loaded') -Color DarkGreen
 }
-Set-StepStatus -id 6 -status 'success' -result (Get-LocalizedMessage 'loaded')
-Write-Log (Get-LocalizedMessage 'languagemanagement_loaded') -Color DarkGreen
 #endregion
 
 #region === 7. Language Pack ===
@@ -693,12 +923,20 @@ Set-StepStatus -id 7 -status 'running'
 Show-ProgressBar -Percent 60 -Label (Get-LocalizedMessage 'language_pack_installation')
 $targetLanguageTag = 'uk-UA'
 $targetLanguageInstalled = $false
+if (-not (Get-Command Get-InstalledLanguage -ErrorAction SilentlyContinue)) {
+    Set-StepStatus -id 7 -status 'skipped' -result 'Пропущено (немає модуля)'
+    Add-StepIssue -id 7 -name (Get-LocalizedMessage 'language_pack_installation') -message 'Command Get-InstalledLanguage недоступна (модуль LanguagePackManagement не завантажено)'
+    Write-Log 'Крок пропущено: модуль керування мовними пакетами недоступний' -Color DarkYellow
+} else {
 if ((Get-InstalledLanguage | Out-String) -match $targetLanguageTag) { $targetLanguageInstalled = $true }
 if (-not $targetLanguageInstalled) { if ((Get-WinUserLanguageList | Out-String) -match $targetLanguageTag) { $targetLanguageInstalled = $true } }
 
 if ($targetLanguageInstalled) {
     Set-StepStatus -id 7 -status 'skipped' -result (Get-LocalizedMessage 'already_installed')
     Write-Log (Get-LocalizedMessage 'language_already_installed' $targetLanguageTag) -Color DarkYellow
+} elseif ($WhatIf) {
+    Set-StepStatus -id 7 -status 'skipped' -result '[WhatIf] Буде встановлено'
+    Write-Log "[WhatIf] Було б встановлено мовний пакет $targetLanguageTag" -Color DarkYellow
 } else {
     Write-Log (Get-LocalizedMessage 'installing_language' $targetLanguageTag) -Color DarkYellow
     try {
@@ -711,18 +949,30 @@ if ($targetLanguageInstalled) {
             if ((Get-InstalledLanguage | Out-String) -match $targetLanguageTag) { $targetLanguageInstalled = $true; break }
             if ((Get-WinUserLanguageList | Out-String) -match $targetLanguageTag) { $targetLanguageInstalled = $true; break }
         }
-        if (-not $targetLanguageInstalled) { Write-ErrorExit (Get-LocalizedMessage 'language_not_found_after_install' $targetLanguageTag) 7 }
-        Set-StepStatus -id 7 -status 'success' -result (Get-LocalizedMessage 'installed')
-        Write-Log (Get-LocalizedMessage 'language_installed_successfully' $targetLanguageTag) -Color DarkGreen
+        if (-not $targetLanguageInstalled) {
+            Set-StepStatus -id 7 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
+            Add-StepIssue -id 7 -name (Get-LocalizedMessage 'language_pack_installation') -message (Get-LocalizedMessage 'language_not_found_after_install' $targetLanguageTag)
+            Write-Log (Get-LocalizedMessage 'language_not_found_after_install' $targetLanguageTag) -Color DarkYellow
+        } else {
+            Set-StepStatus -id 7 -status 'success' -result (Get-LocalizedMessage 'installed')
+            Write-Log (Get-LocalizedMessage 'language_installed_successfully' $targetLanguageTag) -Color DarkGreen
+        }
     } catch {
-        Write-ErrorExit (Get-LocalizedMessage 'installation_error' $_.Exception.Message) 7
+        Set-StepStatus -id 7 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
+        Add-StepIssue -id 7 -name (Get-LocalizedMessage 'language_pack_installation') -message $_.Exception.Message
+        Write-Log (Get-LocalizedMessage 'installation_error' $_.Exception.Message) -Color DarkYellow
     }
+}
 }
 #endregion
 
 #region === 8. Interface ===
 Set-StepStatus -id 8 -status 'running'
 Show-ProgressBar -Percent 70 -Label (Get-LocalizedMessage 'interface_label')
+if ($WhatIf) {
+    Set-StepStatus -id 8 -status 'skipped' -result '[WhatIf]'
+    Write-Log '[WhatIf] Було б встановлено мову інтерфейсу uk-UA' -Color DarkYellow
+} else {
 try {
     Set-WinUILanguageOverride -Language 'uk-UA' -ErrorAction Stop
     $langCode = '0422'
@@ -741,29 +991,59 @@ try {
     Write-Log (Get-LocalizedMessage 'interface_language_set' 'uk-UA') -Color DarkGreen
 } catch {
     Set-StepStatus -id 8 -status 'skipped' -result (Get-LocalizedMessage 'status_partial')
+    Add-StepIssue -id 8 -name (Get-LocalizedMessage 'interface_language_setting') -message $_.Exception.Message
     Write-Log (Get-LocalizedMessage 'interface_language_error' $_.Exception.Message) -Color DarkYellow
+}
 }
 #endregion
 
 #region === 9. Regional Formats ===
 Set-StepStatus -id 9 -status 'running'
 Show-ProgressBar -Percent 80 -Label (Get-LocalizedMessage 'regional_formats_label')
+if ($WhatIf) {
+    Set-StepStatus -id 9 -status 'skipped' -result '[WhatIf]'
+    Write-Log '[WhatIf] Було б встановлено регіон uk-UA, часовий пояс, понеділок як перший день тижня' -Color DarkYellow
+} else {
 try {
     Set-Culture -CultureInfo 'uk-UA' -ErrorAction Stop
     Set-WinSystemLocale -SystemLocale 'uk-UA' -ErrorAction Stop
     $geoId = 240
     Set-WinHomeLocation -GeoId $geoId -ErrorAction Stop
+
+    # Часовий пояс України
+    try {
+        Set-TimeZone -Id 'FLE Standard Time' -ErrorAction Stop
+        Write-Log 'Часовий пояс встановлено: FLE Standard Time (Київ)' -Color DarkGreen
+    } catch {
+        Write-Log "Не вдалося встановити часовий пояс: $($_.Exception.Message)" -Color DarkYellow
+    }
+
+    # Перший день тижня - понеділок, символ валюти - гривня (₴), явно в реєстрі,
+    # оскільки Set-Culture не завжди повністю оновлює legacy NLS-ключі реєстру.
+    try {
+        $intlPath = 'HKCU:\Control Panel\International'
+        Set-ItemProperty -Path $intlPath -Name 'iFirstDayOfWeek' -Value '0' -ErrorAction SilentlyContinue
+        Set-ItemProperty -Path $intlPath -Name 'sCurrency' -Value ([char]0x20B4) -ErrorAction SilentlyContinue
+        Write-Log 'Перший день тижня (пн) і символ валюти (₴) встановлено' -Color DarkGreen
+    } catch {}
+
     Set-StepStatus -id 9 -status 'success' -result (Get-LocalizedMessage 'regional_formats_set_result' 'uk-UA' 'uk-UA')
     Write-Log (Get-LocalizedMessage 'regional_standards_set' 'uk-UA') -Color DarkGreen
 } catch {
     Set-StepStatus -id 9 -status 'skipped' -result (Get-LocalizedMessage 'status_partial')
+    Add-StepIssue -id 9 -name (Get-LocalizedMessage 'regional_formats_setting') -message $_.Exception.Message
     Write-Log (Get-LocalizedMessage 'regional_formats_error' $_.Exception.Message) -Color DarkYellow
+}
 }
 #endregion
 
 #region === 10. Derussification & Layouts ===
 Set-StepStatus -id 10 -status 'running'
 Show-ProgressBar -Percent 90 -Label (Get-LocalizedMessage 'layouts_label')
+if ($WhatIf) {
+    Set-StepStatus -id 10 -status 'skipped' -result '[WhatIf]'
+    Write-Log '[WhatIf] Було б видалено ru-* мову/розкладку/пакети розпізнавання мовлення та рукопису' -Color DarkYellow
+} else {
 try {
     $list = Get-WinUserLanguageList
     $ruLanguages = $list | Where-Object { $_.LanguageTag -match 'ru' }
@@ -802,17 +1082,60 @@ try {
     if (-not (Test-Path $togglePath)) { New-Item -Path $togglePath -Force | Out-Null }
     Set-ItemProperty -Path $togglePath -Name 'Hotkey' -Value 1 -ErrorAction Stop
 
+    # --- Глибша дерусифікація ---
+    # 1) Додаткові ru-* компоненти Windows (розпізнавання мовлення, рукописне
+    #    введення, синтез мовлення) - вони НЕ прибираються самим лише видаленням
+    #    мови зі списку розкладок, а встановлюються/видаляються окремо.
+    try {
+        $ruCapabilities = Get-WindowsCapability -Online -ErrorAction Stop |
+            Where-Object { $_.Name -match '^Language\.(Speech|Handwriting|TextToSpeech|OCR)~.*~ru-RU~' -and $_.State -eq 'Installed' }
+        foreach ($cap in $ruCapabilities) {
+            try {
+                Remove-WindowsCapability -Online -Name $cap.Name -ErrorAction Stop | Out-Null
+                Write-Log "Видалено компонент: $($cap.Name)" -Color DarkYellow
+            } catch {
+                Write-Log "Не вдалося видалити $($cap.Name): $($_.Exception.Message)" -Color DarkYellow
+            }
+        }
+        if ($ruCapabilities.Count -eq 0) { Write-Log 'Додаткових ru-* компонентів (мовлення/рукопис/OCR) не знайдено' -Color DarkGreen }
+    } catch {
+        Write-Log "Перевірку додаткових мовних компонентів пропущено: $($_.Exception.Message)" -Color DarkYellow
+    }
+
+    # 2) Кеш підказок під час набору тексту (може містити напрацьовані ru-слова).
+    #    Офіційно документований шлях Microsoft для скидання персоналізації вводу.
+    try {
+        $ipPath = 'HKCU:\Software\Microsoft\InputPersonalization'
+        if (Test-Path $ipPath) {
+            Set-ItemProperty -Path $ipPath -Name 'RestrictImplicitTextCollection' -Value 1 -ErrorAction SilentlyContinue
+            Set-ItemProperty -Path $ipPath -Name 'RestrictImplicitInkCollection' -Value 1 -ErrorAction SilentlyContinue
+        }
+        $harvesterPath = "$env:LOCALAPPDATA\Microsoft\InputPersonalization"
+        if (Test-Path $harvesterPath) {
+            Remove-Item -Path "$harvesterPath\*" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        Write-Log 'Кеш підказок набору тексту очищено' -Color DarkGreen
+    } catch {
+        Write-Log "Не вдалося очистити кеш підказок набору тексту: $($_.Exception.Message)" -Color DarkYellow
+    }
+
     Set-StepStatus -id 10 -status 'success' -result (Get-LocalizedMessage 'layouts_set_result' @('uk-UA', $secondaryLanguageTag))
     Write-Log (Get-LocalizedMessage 'layout_cleanup_completed' @('uk-UA', $secondaryLanguageTag)) -Color DarkGreen
 } catch {
     Set-StepStatus -id 10 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
+    Add-StepIssue -id 10 -name (Get-LocalizedMessage 'derussification_layouts') -message $_.Exception.Message
     Write-Log (Get-LocalizedMessage 'layout_cleanup_error' $_.Exception.Message) -Color DarkYellow
+}
 }
 #endregion
 
 #region === 11. Optimizations & Explorer Restart ===
 Set-StepStatus -id 11 -status 'running'
 Show-ProgressBar -Percent 95 -Label (Get-LocalizedMessage 'optimization_label')
+if ($WhatIf) {
+    Set-StepStatus -id 11 -status 'skipped' -result '[WhatIf]'
+    Write-Log '[WhatIf] Було б застосовано оптимізації та перезапущено провідник' -Color DarkYellow
+} else {
 $optSuccess = $true
 try { Set-ItemProperty -Path 'HKU:\.DEFAULT\Control Panel\Keyboard' -Name 'InitialKeyboardIndicators' -Value '80000002' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
 try { Set-ItemProperty -Path 'HKCU:\Control Panel\Accessibility\StickyKeys' -Name 'Flags' -Value '510' -ErrorAction SilentlyContinue } catch { $optSuccess = $false }
@@ -841,7 +1164,52 @@ if ($optSuccess) {
     Write-Log (Get-LocalizedMessage 'optimizations_completed') -Color DarkGreen
 } else {
     Set-StepStatus -id 11 -status 'skipped' -result (Get-LocalizedMessage 'status_partial')
+    Add-StepIssue -id 11 -name (Get-LocalizedMessage 'optimizations_restart') -message 'Частину оптимізацій реєстру не вдалося застосувати'
     Write-Log (Get-LocalizedMessage 'some_optimizations_not_applied') -Color DarkYellow
+}
+}
+#endregion
+
+#region === 12. Перевірка результату (верифікація) ===
+Set-StepStatus -id 12 -status 'running'
+Show-ProgressBar -Percent 98 -Label 'Перевірка результату'
+if ($WhatIf) {
+    Set-StepStatus -id 12 -status 'skipped' -result '[WhatIf]'
+    Write-Log '[WhatIf] Перевірку результату пропущено (змін не було)' -Color DarkYellow
+} else {
+    $checks = New-Object System.Collections.ArrayList
+    try {
+        $sysLocale = (Get-WinSystemLocale -ErrorAction SilentlyContinue).Name
+        [void]$checks.Add(@{ Name = 'Системна локаль'; Ok = ($sysLocale -eq 'uk-UA'); Detail = $sysLocale })
+        $uiLang = (Get-WinUILanguageOverride -ErrorAction SilentlyContinue).Name
+        [void]$checks.Add(@{ Name = 'Мова інтерфейсу'; Ok = ($uiLang -eq 'uk-UA'); Detail = $uiLang })
+        $culture = (Get-Culture).Name
+        [void]$checks.Add(@{ Name = 'Регіональний формат'; Ok = ($culture -eq 'uk-UA'); Detail = $culture })
+        $llCheck = Get-WinUserLanguageList
+        $hasUk = [bool]($llCheck | Where-Object { $_.LanguageTag -eq 'uk-UA' })
+        $hasRu = [bool]($llCheck | Where-Object { $_.LanguageTag -match 'ru' })
+        [void]$checks.Add(@{ Name = 'Розкладка uk-UA присутня'; Ok = $hasUk; Detail = if ($hasUk) { 'так' } else { 'ні' } })
+        [void]$checks.Add(@{ Name = 'Розкладку ru видалено'; Ok = (-not $hasRu); Detail = if ($hasRu) { 'ще є' } else { 'видалено' } })
+        $geoId = (Get-WinHomeLocation -ErrorAction SilentlyContinue).GeoId
+        [void]$checks.Add(@{ Name = 'Регіон розташування'; Ok = ($geoId -eq 240); Detail = "GeoId=$geoId" })
+
+        foreach ($c in $checks) {
+            $mark = if ($c.Ok) { 'OK' } else { 'УВАГА' }
+            $color = if ($c.Ok) { 'DarkGreen' } else { 'DarkYellow' }
+            Write-Log "  [$mark] $($c.Name): $($c.Detail)" -Color $color
+        }
+        $passCount = ($checks | Where-Object { $_.Ok }).Count
+        $totalCount = $checks.Count
+        if ($passCount -eq $totalCount) {
+            Set-StepStatus -id 12 -status 'success' -result "$passCount/$totalCount OK"
+        } else {
+            Set-StepStatus -id 12 -status 'skipped' -result "$passCount/$totalCount OK"
+            Add-StepIssue -id 12 -name 'Перевірка результату' -message "Не всі перевірки пройдені: $passCount/$totalCount"
+        }
+    } catch {
+        Set-StepStatus -id 12 -status 'skipped' -result 'Помилка перевірки'
+        Write-Log "Не вдалося виконати перевірку результату: $($_.Exception.Message)" -Color DarkYellow
+    }
 }
 #endregion
 
@@ -858,20 +1226,48 @@ try {
 Clear-InfoPanel
 Show-CompletionBanner
 
-if ($NoRebootPrompt) {
-    Set-InfoPanel -Lines @((Get-LocalizedMessage 'rebooting'))
-    Write-Log 'Auto reboot via NoRebootPrompt' -Color DarkGreen
-    Start-Sleep -Seconds 2
+if ($global:FailedSteps.Count -gt 0) {
+    $issueLines = @("Завершено з $($global:FailedSteps.Count) непринциповими зауваженнями (див. лог):")
+    $issueLines += ($global:FailedSteps | ForEach-Object { "  • $($_.Name): $($_.Message)" })
+    Set-InfoPanel -Style 'Warning' -Lines $issueLines
+    Write-Host ''
+    Start-Sleep -Seconds 3
+}
+
+if ($WhatIf) {
+    Set-InfoPanel -Lines @('Це був попередній перегляд (-WhatIf) - жодних реальних змін внесено не було.', 'Запустіть без -WhatIf, щоб застосувати.')
+    Write-Log '[WhatIf] Завершено без застосування змін' -Color DarkYellow
     Restore-Console
-    Restart-Computer
+    Write-Host ''
+    Write-Host '  Натисніть будь-яку клавішу, щоб завершити...' -ForegroundColor Gray
+    $null = [Console]::ReadKey($true)
+} elseif ($NoRebootPrompt) {
+    Write-Log 'Auto reboot via NoRebootPrompt (з можливістю скасувати)' -Color DarkGreen
+    $proceed = Show-CountdownReboot -Seconds 5
+    if ($proceed) {
+        Restore-Console
+        Restart-Computer
+    } else {
+        Set-InfoPanel -Style 'Warning' -Lines @('Перезавантаження скасовано.', (Get-LocalizedMessage 'dont_forget_reboot'))
+        Write-Log 'Автоматичне перезавантаження скасовано користувачем' -Color DarkYellow
+        Restore-Console
+    }
 } else {
     $reboot = Show-Prompt -Text (Get-LocalizedMessage 'reboot_now_prompt') -Default 'Y'
     if ($reboot -in (Get-LocalizedMessage 'reboot_yes_answers')) {
-        Set-InfoPanel -Lines @("$(Get-LocalizedMessage 'rebooting')$(Get-LocalizedMessage 'see_you_soon')")
         Write-Log (Get-LocalizedMessage 'reboot_requested') -Color DarkGreen
-        Start-Sleep -Seconds 2
-        Restore-Console
-        Restart-Computer
+        $proceed = Show-CountdownReboot -Seconds 15
+        if ($proceed) {
+            Restore-Console
+            Restart-Computer
+        } else {
+            Set-InfoPanel -Style 'Warning' -Lines @('Перезавантаження скасовано.', (Get-LocalizedMessage 'dont_forget_reboot'))
+            Write-Log 'Перезавантаження скасовано користувачем під час відліку' -Color DarkYellow
+            Restore-Console
+            Write-Host ''
+            Write-Host '  Натисніть будь-яку клавішу, щоб завершити...' -ForegroundColor Gray
+            $null = [Console]::ReadKey($true)
+        }
     } else {
         Set-InfoPanel -Style 'Warning' -Lines @(
             (Get-LocalizedMessage 'dont_forget_reboot'),
