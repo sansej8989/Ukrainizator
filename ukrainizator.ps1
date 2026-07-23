@@ -122,16 +122,28 @@ $global:UseAnsi = $false
 $global:AnsiLinesDrawn = 0
 
 $Palette = @{
-    Reset  = "$ESC[0m"
-    Bold   = "$ESC[1m"
-    Dim    = "$ESC[2m"
-    Blue   = "$ESC[38;5;33m"
-    Yellow = "$ESC[38;5;221m"
-    Green  = "$ESC[38;5;78m"
-    Red    = "$ESC[38;5;203m"
-    Cyan   = "$ESC[38;5;51m"
-    Gray   = "$ESC[38;5;244m"
-    White  = "$ESC[38;5;231m"
+    Reset   = "$ESC[0m"
+    Bold    = "$ESC[1m"
+    Dim     = "$ESC[2m"
+    Blue    = "$ESC[38;2;70;140;255m"    # яскравий блакитний (прапор + акцент)
+    Gold    = "$ESC[38;2;255;209;70m"    # яскраве золото (прапор)
+    Yellow  = "$ESC[38;2;255;209;70m"    # аліас на Gold - для сумісності зі старим кодом
+    Green   = "$ESC[38;2;60;222;141m"    # соковитий смарагдовий (успіх)
+    Red     = "$ESC[38;2;255;90;95m"     # яскраво-коралово-червоний (помилка)
+    Cyan    = "$ESC[38;2;56;225;225m"    # електрик-бірюза (інфо/спінер)
+    Magenta = "$ESC[38;2;199;125;255m"   # акцент
+    Gray    = "$ESC[38;2;150;162;180m"   # м'якший, але контрастніший сірий
+    White   = "$ESC[38;2;245;247;250m"   # яскраво-білий
+}
+
+function Get-GradientColor {
+    # Плавний перехід від блакитного до золотого (прапор України) за t=0..1
+    param([double]$T)
+    if ($T -lt 0) { $T = 0 }; if ($T -gt 1) { $T = 1 }
+    $r = [int](70  + (255 - 70)  * $T)
+    $g = [int](140 + (209 - 140) * $T)
+    $b = [int](255 + (70  - 255) * $T)
+    return "$ESC[38;2;${r};${g};${b}m"
 }
 
 $global:UIState = @{
@@ -223,7 +235,7 @@ function Get-StepIconPlain {
     switch ($Step.status) {
         'success' { return @{ Char = [string][char]0x2713; Color = 'Green' } }
         'error'   { return @{ Char = [string][char]0x2717; Color = 'Red' } }
-        'skipped' { return @{ Char = [string][char]0x25CF; Color = 'DarkYellow' } }
+        'skipped' { return @{ Char = [string][char]0x25CF; Color = 'Yellow' } }
         default   { return @{ Char = [string][char]0x25CF; Color = 'DarkGray' } }
     }
 }
@@ -267,19 +279,19 @@ function Build-Frame {
     $titleRight = "$($P.Dim)v$scriptVersion$($P.Reset) "
     $gap = [Math]::Max(1, ($w - 2) - (Get-VisualLength $titleLeft) - (Get-VisualLength $titleRight))
     $titleLine = $titleLeft + (' ' * $gap) + $titleRight
-    $subtitle = " $($P.Cyan)Встановлення української мови в Windows$($P.Reset)"
+    $subtitle = " $($P.Bold)$($P.Gold)Встановлення української мови в Windows$($P.Reset)"
 
     $lines.Add("$($P.Blue)$top$($P.Reset)")
     $lines.Add("$($P.Blue)$([char]0x2502)$($P.Reset)" + (Set-PaddedLine $titleLine ($w - 2)) + "$($P.Blue)$([char]0x2502)$($P.Reset)")
     $lines.Add("$($P.Blue)$([char]0x2502)$($P.Reset)" + (Set-PaddedLine $subtitle ($w - 2)) + "$($P.Blue)$([char]0x2502)$($P.Reset)")
-    $lines.Add("$($P.Blue)$bot$($P.Reset)")
+    $lines.Add("$($P.Gold)$bot$($P.Reset)")
     $lines.Add('')
 
     # --- Steps ---
     foreach ($step in $global:steps) {
         $icon = Get-StepIcon $step
         $idText = $step.id.ToString().PadLeft(2)
-        $nameRaw = " $idText.  $($step.name)"
+        $nameRaw = " $($P.Magenta)$idText.$($P.Reset)  $($step.name)"
         $nameCol = Set-PaddedLine $nameRaw 48
         $resText = ''
         if ($step.result) { $resText = "$($P.Dim)$([char]0x2192)$($P.Reset) $($step.result)" }
@@ -298,10 +310,16 @@ function Build-Frame {
     $pct = [Math]::Max(0, [Math]::Min(100, $global:UIState.Percent))
     $filled = [int][math]::Floor($pct / 100 * $barSize)
     $empty = $barSize - $filled
-    $barColor = $P.Cyan
-    if ($pct -ge 100) { $barColor = $P.Green }
-    $bar = "$barColor" + ([string]([char]0x2588) * $filled) + "$($P.Dim)" + ([string]([char]0x2591) * $empty) + "$($P.Reset)"
-    $pctText = "$($pct.ToString().PadLeft(3))%"
+    $barChars = New-Object System.Text.StringBuilder
+    for ($i = 0; $i -lt $filled; $i++) {
+        $t = if ($barSize -gt 1) { $i / [double]($barSize - 1) } else { 0 }
+        [void]$barChars.Append("$(Get-GradientColor $t)$([char]0x2588)")
+    }
+    [void]$barChars.Append($P.Reset)
+    [void]$barChars.Append("$($P.Dim)" + ([string]([char]0x2591) * $empty) + "$($P.Reset)")
+    $bar = $barChars.ToString()
+    $pctColor = if ($pct -ge 100) { $P.Gold } else { $P.White }
+    $pctText = "$($P.Bold)$pctColor$($pct.ToString().PadLeft(3))%$($P.Reset)"
     $labelText = ''
     if ($global:UIState.ProgressLabel) { $labelText = "  $($P.Dim)$($global:UIState.ProgressLabel)$($P.Reset)" }
     $lines.Add("  $bar  $pctText$labelText")
