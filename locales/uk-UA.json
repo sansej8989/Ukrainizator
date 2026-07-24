@@ -56,11 +56,32 @@
   "powershell_version_detected": "Версія PowerShell:",
   "powershell_version_required": "Потрібен PowerShell 5.1+",
   "press_any_key_to_exit": "Натисніть будь-яку клавішу для виходу...",
-  "reboot_no_answers": ["N", "n", "No", "NO", "Н", "н", "Ні", "ні"],
+  "reboot_no_answers": [
+    "N",
+    "n",
+    "No",
+    "NO",
+    "Н",
+    "н",
+    "Ні",
+    "ні"
+  ],
   "reboot_now_prompt": "Перезавантажити зараз? (Y/N): ",
   "reboot_now_prompt_full": "Перезавантажити зараз? (Y/N): ",
   "reboot_requested": "Запрошено перезавантаження",
-  "reboot_yes_answers": ["Y", "y", "Yes", "YES", "ok", "OK", "yep", "Т", "т", "Так", "так"],
+  "reboot_yes_answers": [
+    "Y",
+    "y",
+    "Yes",
+    "YES",
+    "ok",
+    "OK",
+    "yep",
+    "Т",
+    "т",
+    "Так",
+    "так"
+  ],
   "rebooting": "Перезавантаження...",
   "regional_formats_error": "Помилка регіональних форматів:",
   "regional_formats_label": "Регіональні формати",
@@ -92,5 +113,10 @@
   "warning_message_1": "УВАГА: Цей скрипт змінює системну мову та розкладки.",
   "warning_message_2": "Після завершення буде потрібне перезавантаження.",
   "warning_message_3": "РЕКОМЕНДОВАНО: СТВОРИТИ ТОЧКУ ВІДНОВЛЕННЯ.",
-  "your_choice": "Ваш вибір (A/C): "
+  "your_choice": "Ваш вибір (A/C): ",
+  "all_done": "ВСЕ ГОТОВО!",
+  "font_cache_cleaned": "Кеш шрифтів очищено",
+  "installing_language": "Встановлення мови {0}...",
+  "language_already_installed": "Мова {0} вже встановлена",
+  "restarting_explorer": "Перезапуск explorer.exe..."
 }

@@ -56,10 +56,23 @@
   "powershell_version_detected": "PowerShell version:",
   "powershell_version_required": "PowerShell 5.1+ is required",
   "press_any_key_to_exit": "Press any key to exit...",
-  "reboot_no_answers": ["N", "n", "No", "NO"],
+  "reboot_no_answers": [
+    "N",
+    "n",
+    "No",
+    "NO"
+  ],
   "reboot_now_prompt": "Reboot now? (Y/N): ",
   "reboot_requested": "Reboot requested",
-  "reboot_yes_answers": ["Y", "y", "Yes", "YES", "ok", "OK", "yep"],
+  "reboot_yes_answers": [
+    "Y",
+    "y",
+    "Yes",
+    "YES",
+    "ok",
+    "OK",
+    "yep"
+  ],
   "rebooting": "Rebooting...",
   "regional_formats_error": "Regional formats error:",
   "regional_formats_label": "Regional formats",
@@ -91,5 +104,10 @@
   "warning_message_1": "WARNING: This script changes system language and layouts.",
   "warning_message_2": "A reboot will be required after completion.",
   "warning_message_3": "RECOMMENDED: CREATE A RESTORE POINT.",
-  "your_choice": "Your choice (A/C): "
+  "your_choice": "Your choice (A/C): ",
+  "all_done": "ALL DONE!",
+  "font_cache_cleaned": "Font cache cleared",
+  "installing_language": "Installing language {0}...",
+  "language_already_installed": "Language {0} is already installed",
+  "restarting_explorer": "Restarting explorer.exe..."
 }
