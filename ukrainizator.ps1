@@ -111,6 +111,7 @@ try {
     $createdNew = $false
     $global:UkrainizatorMutex = New-Object System.Threading.Mutex($false, 'Global\UkrainizatorRunning', [ref]$createdNew)
     if (-not $global:UkrainizatorMutex.WaitOne(0)) {
+        Invoke-Sound -Type 'Lock'
         Write-Host ''
         Write-Host '  ============================================' -ForegroundColor Red
         Write-Host '  Українізатор вже запущено в іншому вікні!' -ForegroundColor Red
@@ -517,6 +518,60 @@ function Show-Frame {
     $global:AnsiLinesDrawn = $lines.Count
 }
 
+function Invoke-Sound {
+    # Єдина "звукова палітра" скрипта - замість розрізнених окремих Beep().
+    # PC-спікер уміє лише один тон за раз, тому "мелодії" - це короткі
+    # послідовності нот. Виклики короткі (десятки-сотні мс), тож на UI не впливають.
+    param(
+        [ValidateSet('Startup','StepSuccess','StepSkipped','StepError','Fanfare','CountdownTick','Cancel','Lock')]
+        [string]$Type,
+        [int]$Variant = 0
+    )
+    try {
+        switch ($Type) {
+            'Startup' {
+                # Коротка "заставка" на старті - висхідне тріо
+                [Console]::Beep(392, 60)   # G4
+                [Console]::Beep(523, 60)   # C5
+                [Console]::Beep(659, 100)  # E5
+            }
+            'StepSuccess' {
+                # "Монетка": два швидкі висхідні тони, трохи вищі з кожним кроком
+                $base = 420 + ($Variant * 25)
+                [Console]::Beep($base, 40)
+                [Console]::Beep([int]($base * 1.5), 90)
+            }
+            'StepSkipped' {
+                # Нейтральний одиночний "клац" - не радісно, не тривожно
+                [Console]::Beep(440, 60)
+            }
+            'StepError' {
+                # Низхідне "бз-бз"
+                [Console]::Beep(220, 120)
+                [Console]::Beep(180, 180)
+            }
+            'Fanfare' {
+                # Мажорне арпеджіо + фінальна трель на завершення всього прогону
+                [Console]::Beep(523, 130)   # C5
+                [Console]::Beep(659, 130)   # E5
+                [Console]::Beep(784, 130)   # G5
+                [Console]::Beep(1046, 220)  # C6
+                [Console]::Beep(1318, 300)  # E6
+            }
+            'CountdownTick' {
+                [Console]::Beep(880, 35)
+            }
+            'Cancel' {
+                [Console]::Beep(660, 80)
+                [Console]::Beep(440, 130)
+            }
+            'Lock' {
+                [Console]::Beep(220, 250)
+            }
+        }
+    } catch {}
+}
+
 function Set-StepStatus {
     param([int]$id, [string]$status, [string]$result = '', [string]$details = '')
     $step = $global:steps | Where-Object { $_.id -eq $id }
@@ -524,8 +579,10 @@ function Set-StepStatus {
     $step.result = $result
     $step.details = $details
 
-    if ($status -eq 'success' -or $status -eq 'skipped') {
-        try { [Console]::Beep(350 + ($id * 50), 80) } catch {}
+    if ($status -eq 'success') {
+        Invoke-Sound -Type 'StepSuccess' -Variant $id
+    } elseif ($status -eq 'skipped') {
+        Invoke-Sound -Type 'StepSkipped'
     }
 
     if ($global:UseAnsi) {
@@ -657,7 +714,7 @@ function Restore-Console {
 function Write-ErrorExit {
     param([string]$Message, [int]$stepId)
     Set-StepStatus -id $stepId -status 'error' -result (Get-LocalizedMessage 'error_prefix')
-    try { [Console]::Beep(300, 300) } catch {}
+    Invoke-Sound -Type 'StepError'
     Set-InfoPanel -Lines @($Message) -Style 'Error'
     Write-Log "$(Get-LocalizedMessage 'error_log_prefix')$Message" -Color Red
     if ($global:UseAnsi) { Write-Raw "`n`n" }
@@ -709,9 +766,11 @@ function Show-CountdownReboot {
     param([int]$Seconds = 15)
     for ($s = $Seconds; $s -gt 0; $s--) {
         Set-InfoPanel -Lines @("$(Get-LocalizedMessage 'rebooting') Перезавантаження через $s с... (натисніть будь-яку клавішу, щоб скасувати)")
+        Invoke-Sound -Type 'CountdownTick'
         try {
             if ([Console]::KeyAvailable) {
                 [Console]::ReadKey($true) | Out-Null
+                Invoke-Sound -Type 'Cancel'
                 return $false
             }
         } catch {}
@@ -731,6 +790,7 @@ if ($global:UseAnsi) {
     try { Clear-Host } catch {}
     Show-PlainHeader
 }
+Invoke-Sound -Type 'Startup'
 try {
     Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { try { [Console]::CursorVisible = $true } catch {} } -ErrorAction SilentlyContinue | Out-Null
 } catch {}
@@ -1347,10 +1407,7 @@ try {
 Show-ProgressBar -Percent 100 -Label (Get-LocalizedMessage 'all_done')
 
 try {
-    [Console]::Beep(523, 150)
-    [Console]::Beep(659, 150)
-    [Console]::Beep(784, 150)
-    [Console]::Beep(1046, 300)
+    Invoke-Sound -Type 'Fanfare'
 } catch {}
 
 Clear-InfoPanel
