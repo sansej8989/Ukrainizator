@@ -232,6 +232,15 @@ Get-ChildItem -Path $PSScriptRoot -Filter 'Ukrainizator_*.log' -File -ErrorActio
 Get-ChildItem -Path $logDir -Filter 'Ukrainizator_*.log' -File -ErrorAction SilentlyContinue |
     Sort-Object LastWriteTime -Descending | Select-Object -Skip 2 | Remove-Item -Force -ErrorAction SilentlyContinue
 $logFile = Join-Path $logDir "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+
+$backupDir = Join-Path $PSScriptRoot 'backup'
+if (-not (Test-Path $backupDir)) { New-Item -Path $backupDir -ItemType Directory -Force | Out-Null }
+# Якщо лишились старі знімки в корені теки (з версій до 5.0.0) - переносимо в backup/,
+# щоб -Revert однаково їх бачив і корінь теки більше не засмічувався.
+Get-ChildItem -Path $PSScriptRoot -Filter 'Ukrainizator_backup_*.json' -File -ErrorAction SilentlyContinue | ForEach-Object {
+    Move-Item -Path $_.FullName -Destination (Join-Path $backupDir $_.Name) -Force -ErrorAction SilentlyContinue
+}
+
 $startTime = Get-Date
 $global:steps = @()
 $global:FailedSteps = New-Object System.Collections.ArrayList   # для "продовжити після помилки" - підсумок наприкінці
@@ -738,7 +747,7 @@ if (-not (Read-LocalizationFile $global:CurrentLanguage)) {
 #region === Відкат (-Revert) ===
 if ($Revert) {
     Write-Log 'Запущено режим відкату (-Revert)' -Color DarkYellow
-    $backupPattern = Join-Path $PSScriptRoot 'Ukrainizator_backup_*.json'
+    $backupPattern = Join-Path $backupDir 'Ukrainizator_backup_*.json'
     $lastBackup = Get-ChildItem -Path $backupPattern -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
     if (-not $lastBackup) {
         Set-InfoPanel -Style 'Error' -Lines @('Резервний знімок не знайдено.', 'Відкат можливий лише після хоча б одного звичайного запуску скрипта.')
@@ -852,10 +861,10 @@ if (-not $WhatIf) {
             GeoId         = (Get-WinHomeLocation -ErrorAction SilentlyContinue).GeoId
             LanguageList  = @((Get-WinUserLanguageList | ForEach-Object { $_.LanguageTag }))
         }
-        $backupFile = Join-Path $PSScriptRoot "Ukrainizator_backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
+        $backupFile = Join-Path $backupDir "Ukrainizator_backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').json"
         $backupObj | ConvertTo-Json | Set-Content -Path $backupFile -Encoding UTF8
         # Лишаємо тільки 5 останніх знімків, щоб не смітити теку
-        Get-ChildItem -Path (Join-Path $PSScriptRoot 'Ukrainizator_backup_*.json') -File -ErrorAction SilentlyContinue |
+        Get-ChildItem -Path (Join-Path $backupDir 'Ukrainizator_backup_*.json') -File -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime -Descending | Select-Object -Skip 5 | Remove-Item -Force -ErrorAction SilentlyContinue
         Write-Log "Резервний знімок налаштувань збережено: $(Split-Path $backupFile -Leaf) (для відкату: -Revert)" -Color DarkGreen
     } catch {

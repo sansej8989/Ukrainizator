@@ -1,2 +1,5 @@
 *.log
+backup/*.json
+!backup/.gitkeep
+!log/.gitkeep
 run_omniroute.bat
