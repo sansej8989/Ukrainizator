@@ -1,4 +1,4 @@
-﻿# Ukrainizator v4.2.0
+﻿# Ukrainizator v5.0.0
 # ============================================================
 # Windows Ukrainian language setup script (Modern UI)
 # ============================================================
@@ -100,6 +100,35 @@ function Test-ScriptIntegrity {
 Test-ScriptIntegrity | Out-Null
 #endregion
 
+#region === Захист від паралельного запуску ===
+# Named Mutex на рівні ОС (а не файл-замок): якщо скрипт випадково запустили
+# двічі (подвійний клік по .bat, або старий інстанс ще не встиг закритись),
+# другий запуск одразу побачить, що м'ютекс зайнятий, і ввічливо вийде -
+# замість того, щоб два інстанси одночасно лізли в реєстр і калічили
+# налаштування один одному.
+$global:UkrainizatorMutex = $null
+try {
+    $createdNew = $false
+    $global:UkrainizatorMutex = New-Object System.Threading.Mutex($false, 'Global\UkrainizatorRunning', [ref]$createdNew)
+    if (-not $global:UkrainizatorMutex.WaitOne(0)) {
+        Write-Host ''
+        Write-Host '  ============================================' -ForegroundColor Red
+        Write-Host '  Українізатор вже запущено в іншому вікні!' -ForegroundColor Red
+        Write-Host '  Одночасний запуск двох копій може пошкодити налаштування.' -ForegroundColor Red
+        Write-Host '  Закрийте інший запущений екземпляр і спробуйте знову.' -ForegroundColor Red
+        Write-Host '  ============================================' -ForegroundColor Red
+        Write-Host ''
+        if (-not $Silent) {
+            Write-Host '  Натисніть будь-яку клавішу, щоб завершити...' -ForegroundColor Gray
+            $null = [Console]::ReadKey($true)
+        }
+        exit 1
+    }
+} catch {
+    Write-DebugLog "Не вдалося створити м'ютекс блокування: $($_.Exception.Message)"
+}
+#endregion
+
 try {
     cmd /c chcp 65001 | Out-Null
 } catch {}
@@ -171,12 +200,38 @@ function Get-LocalizedMessage {
         return $key
     }
 }
+
+function Get-FriendlyErrorMessage {
+    # Типові .NET/PowerShell винятки завжди англійською - перекладаємо
+    # найпоширеніші причини, а невідомі лишаємо як є (з оригіналом у дужках
+    # для діагностики - краще недоперекласти, ніж збрехати про причину).
+    param([string]$RawMessage)
+    if (-not $RawMessage) { return $RawMessage }
+    $patterns = @(
+        @{ Pattern = 'network|internet|resolve|remote name|connection|timed? ?out'; Text = "Немає з'єднання з інтернетом або сервер недоступний" }
+        @{ Pattern = 'access is denied|unauthorized|permission'; Text = 'Відмовлено в доступі (перевірте права адміністратора)' }
+        @{ Pattern = "is not recognized|not recognized as the name|isn'?t recognized"; Text = 'Потрібна команда відсутня в цій збірці/редакції Windows' }
+        @{ Pattern = 'cannot find path|does not exist|could not be found|not found'; Text = 'Вказаний шлях або ресурс не знайдено' }
+        @{ Pattern = 'disk|not enough space'; Text = 'Недостатньо місця на диску' }
+        @{ Pattern = 'already exists'; Text = 'Такий об''єкт уже існує' }
+        @{ Pattern = 'operation is not supported|not supported on this platform'; Text = 'Ця дія не підтримується на поточній системі' }
+    )
+    foreach ($p in $patterns) {
+        if ($RawMessage -match $p.Pattern) { return "$($p.Text) ($RawMessage)" }
+    }
+    return $RawMessage
+}
 #endregion
 
 #region === Settings & State ===
-$scriptVersion = '4.2.0'
+$scriptVersion = '5.0.0'
+$logDir = Join-Path $PSScriptRoot 'log'
+if (-not (Test-Path $logDir)) { New-Item -Path $logDir -ItemType Directory -Force | Out-Null }
+# Не смітимо в корені теки: усі логи йдуть у log/, лишаємо 3 останні (включно з новим).
 Get-ChildItem -Path $PSScriptRoot -Filter 'Ukrainizator_*.log' -File -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-$logFile = Join-Path $PSScriptRoot "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+Get-ChildItem -Path $logDir -Filter 'Ukrainizator_*.log' -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -Skip 2 | Remove-Item -Force -ErrorAction SilentlyContinue
+$logFile = Join-Path $logDir "Ukrainizator_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 $startTime = Get-Date
 $global:steps = @()
 $global:FailedSteps = New-Object System.Collections.ArrayList   # для "продовжити після помилки" - підсумок наприкінці
@@ -346,7 +401,7 @@ function Get-StepIcon {
     }
 }
 
-function Build-Frame {
+function New-Frame {
     $w = Get-PanelWidth
     $P = $Palette
     $lines = New-Object System.Collections.Generic.List[string]
@@ -436,9 +491,9 @@ function Build-Frame {
     return $lines.ToArray()
 }
 
-function Render-UI {
+function Show-Frame {
     if (-not $global:UseAnsi) { return }
-    $lines = Build-Frame
+    $lines = New-Frame
     $sb = New-Object System.Text.StringBuilder
     # Раніше тут курсор піднімався на розраховану кількість рядків і
     # стирав "далі до кінця екрана" - але якщо термінал у перші миті
@@ -465,7 +520,7 @@ function Set-StepStatus {
     }
 
     if ($global:UseAnsi) {
-        Render-UI
+        Show-Frame
         return
     }
 
@@ -497,7 +552,7 @@ function Show-ProgressBar {
     param([int]$Percent, [string]$Label = '')
     $global:UIState.Percent = $Percent
     $global:UIState.ProgressLabel = $Label
-    if ($global:UseAnsi) { Render-UI }
+    if ($global:UseAnsi) { Show-Frame }
 }
 
 function Set-InfoPanel {
@@ -505,7 +560,7 @@ function Set-InfoPanel {
     $global:UIState.InfoLines = $Lines
     $global:UIState.InfoStyle = $Style
     if ($global:UseAnsi) {
-        Render-UI
+        Show-Frame
         return
     }
     $fg = 'Cyan'
@@ -519,7 +574,7 @@ function Set-InfoPanel {
 function Clear-InfoPanel {
     $global:UIState.InfoLines = @()
     $global:UIState.InfoStyle = 'Normal'
-    if ($global:UseAnsi) { Render-UI }
+    if ($global:UseAnsi) { Show-Frame }
 }
 
 function Write-Log {
@@ -536,7 +591,7 @@ function Write-Log {
         $formatted = "$($Palette.Dim)$timestamp$($Palette.Reset)  $entryColor$Message$($Palette.Reset)"
         [void]$global:UIState.RecentLogs.Add($formatted)
         while ($global:UIState.RecentLogs.Count -gt 3) { $global:UIState.RecentLogs.RemoveAt(0) }
-        Render-UI
+        Show-Frame
     } else {
         Write-Host "  $logMessage" -ForegroundColor $Color
     }
@@ -570,7 +625,7 @@ function Show-Prompt {
     if ($global:UseAnsi) {
         $global:UIState.PromptActive = $true
         $global:UIState.PromptText = $Text
-        Render-UI
+        Show-Frame
         Write-Raw $Default
         $result = Read-LiveInput -Default $Default
         $global:UIState.PromptActive = $false
@@ -612,7 +667,7 @@ function Show-CompletionBanner {
         "  $($P.Dim)$(Get-LocalizedMessage 'log_file') $logFile$($P.Reset)"
     )
     if ($global:UseAnsi) {
-        Render-UI
+        Show-Frame
         return
     }
     $w = 50
@@ -757,7 +812,7 @@ $global:steps = @(
     @{ id = 12; name = 'Перевірка результату';                              status = 'pending'; result = ''; details = '' }
 )
 
-Render-UI
+Show-Frame
 Write-Log "$(Get-LocalizedMessage 'starting_ukrainizator') v$scriptVersion"
 if ($WhatIf) { Write-Log '[WhatIf] Режим попереднього перегляду: жодних реальних змін внесено НЕ буде' -Color DarkYellow }
 
@@ -804,7 +859,7 @@ if (-not $WhatIf) {
             Sort-Object LastWriteTime -Descending | Select-Object -Skip 5 | Remove-Item -Force -ErrorAction SilentlyContinue
         Write-Log "Резервний знімок налаштувань збережено: $(Split-Path $backupFile -Leaf) (для відкату: -Revert)" -Color DarkGreen
     } catch {
-        Write-Log "Не вдалося зберегти резервний знімок: $($_.Exception.Message)" -Color DarkYellow
+        Write-Log "Не вдалося зберегти резервний знімок: $(Get-FriendlyErrorMessage $_.Exception.Message)" -Color DarkYellow
     }
 }
 #endregion
@@ -826,6 +881,22 @@ if ($PSVersionTable.PSVersion -lt [version]'5.1') {
 }
 Set-StepStatus -id 2 -status 'success' -result "v$($PSVersionTable.PSVersion)"
 Write-Log "$(Get-LocalizedMessage 'powershell_version_detected') $($PSVersionTable.PSVersion)" -Color DarkGreen
+
+# Визначення збірки/редакції Windows - потрібно, щоб коректно обрати спосіб
+# встановлення мовного пакету нижче (див. крок 6/7): новий Install-Language
+# є не в кожній збірці, тому маємо надійний запасний варіант через DISM.
+try {
+    $osInfo = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction Stop
+    $global:WinBuild = [int]$osInfo.CurrentBuildNumber
+    $global:WinDisplayVersion = if ($osInfo.DisplayVersion) { $osInfo.DisplayVersion } else { $osInfo.ReleaseId }
+    $global:WinProductName = $osInfo.ProductName
+    Write-Log "Виявлено: $($global:WinProductName), $($global:WinDisplayVersion) (build $($global:WinBuild))" -Color DarkGreen
+} catch {
+    $global:WinBuild = 0
+    $global:WinDisplayVersion = 'невідомо'
+    $global:WinProductName = 'невідома збірка Windows'
+    Write-Log 'Не вдалося визначити збірку Windows - буде використано універсальний (DISM) спосіб встановлення мови' -Color DarkYellow
+}
 #endregion
 
 #region === 3. Warning & Confirmation ===
@@ -869,8 +940,8 @@ try {
         Write-Log (Get-LocalizedMessage 'restore_point_already_created') -Color DarkGreen
     } else {
         Set-StepStatus -id 4 -status 'skipped' -result (Get-LocalizedMessage 'skipped')
-        Add-StepIssue -id 4 -name (Get-LocalizedMessage 'restore_point') -message $_.Exception.Message
-        Write-Log "$(Get-LocalizedMessage 'restore_point_failed')$($_.Exception.Message)" -Color DarkYellow
+        Add-StepIssue -id 4 -name (Get-LocalizedMessage 'restore_point') -message (Get-FriendlyErrorMessage $_.Exception.Message)
+        Write-Log "$(Get-LocalizedMessage 'restore_point_failed')$(Get-FriendlyErrorMessage $_.Exception.Message)" -Color DarkYellow
     }
 }
 }
@@ -908,13 +979,24 @@ if ($Silent) {
 Set-StepStatus -id 6 -status 'running'
 Show-ProgressBar -Percent 50 -Label (Get-LocalizedMessage 'modules_check')
 Import-Module LanguagePackManagement -ErrorAction SilentlyContinue
-if (-not (Get-Module -ListAvailable -Name LanguagePackManagement)) {
-    Set-StepStatus -id 6 -status 'skipped' -result 'Модуль недоступний'
-    Add-StepIssue -id 6 -name (Get-LocalizedMessage 'modules_check') -message (Get-LocalizedMessage 'languagemanagement_not_available')
-    Write-Log (Get-LocalizedMessage 'languagemanagement_not_available') -Color DarkYellow
-} else {
+$global:UseModernLanguageApi = [bool](Get-Command Install-Language -ErrorAction SilentlyContinue)
+if ($global:UseModernLanguageApi) {
     Set-StepStatus -id 6 -status 'success' -result (Get-LocalizedMessage 'loaded')
     Write-Log (Get-LocalizedMessage 'languagemanagement_loaded') -Color DarkGreen
+} else {
+    # Модуль LanguagePackManagement є не в кожній збірці Windows (з'явився
+    # пізніше і не завжди присутній навіть у сучасних Windows 10/11).
+    # DISM-командлети Add-/Get-WindowsCapability є набагато старішими й
+    # практично гарантовано доступні на будь-якій підтримуваній збірці -
+    # тому крок не провалюється, а просто переходить на них.
+    if (Get-Command Get-WindowsCapability -ErrorAction SilentlyContinue) {
+        Set-StepStatus -id 6 -status 'skipped' -result 'DISM (запасний спосіб)'
+        Write-Log 'Install-Language недоступний у цій збірці - буде використано універсальний спосіб через DISM (Add-WindowsCapability)' -Color DarkYellow
+    } else {
+        Set-StepStatus -id 6 -status 'skipped' -result 'Недоступно'
+        Add-StepIssue -id 6 -name (Get-LocalizedMessage 'modules_check') -message 'Ані Install-Language, ані DISM-командлети недоступні на цій системі'
+        Write-Log (Get-LocalizedMessage 'languagemanagement_not_available') -Color DarkYellow
+    }
 }
 #endregion
 
@@ -923,13 +1005,20 @@ Set-StepStatus -id 7 -status 'running'
 Show-ProgressBar -Percent 60 -Label (Get-LocalizedMessage 'language_pack_installation')
 $targetLanguageTag = 'uk-UA'
 $targetLanguageInstalled = $false
-if (-not (Get-Command Get-InstalledLanguage -ErrorAction SilentlyContinue)) {
-    Set-StepStatus -id 7 -status 'skipped' -result 'Пропущено (немає модуля)'
-    Add-StepIssue -id 7 -name (Get-LocalizedMessage 'language_pack_installation') -message 'Command Get-InstalledLanguage недоступна (модуль LanguagePackManagement не завантажено)'
-    Write-Log 'Крок пропущено: модуль керування мовними пакетами недоступний' -Color DarkYellow
-} else {
-if ((Get-InstalledLanguage | Out-String) -match $targetLanguageTag) { $targetLanguageInstalled = $true }
-if (-not $targetLanguageInstalled) { if ((Get-WinUserLanguageList | Out-String) -match $targetLanguageTag) { $targetLanguageInstalled = $true } }
+
+function Test-UkrainianLanguageInstalled {
+    if (Get-Command Get-InstalledLanguage -ErrorAction SilentlyContinue) {
+        if ((Get-InstalledLanguage | Out-String) -match $targetLanguageTag) { return $true }
+    }
+    if ((Get-WinUserLanguageList | Out-String) -match $targetLanguageTag) { return $true }
+    if (Get-Command Get-WindowsCapability -ErrorAction SilentlyContinue) {
+        $cap = Get-WindowsCapability -Online -Name "Language.Basic~~~$targetLanguageTag~0.0.1.0" -ErrorAction SilentlyContinue
+        if ($cap -and $cap.State -eq 'Installed') { return $true }
+    }
+    return $false
+}
+
+$targetLanguageInstalled = Test-UkrainianLanguageInstalled
 
 if ($targetLanguageInstalled) {
     Set-StepStatus -id 7 -status 'skipped' -result (Get-LocalizedMessage 'already_installed')
@@ -937,17 +1026,43 @@ if ($targetLanguageInstalled) {
 } elseif ($WhatIf) {
     Set-StepStatus -id 7 -status 'skipped' -result '[WhatIf] Буде встановлено'
     Write-Log "[WhatIf] Було б встановлено мовний пакет $targetLanguageTag" -Color DarkYellow
+} elseif (-not $global:UseModernLanguageApi -and -not (Get-Command Get-WindowsCapability -ErrorAction SilentlyContinue)) {
+    Set-StepStatus -id 7 -status 'skipped' -result 'Пропущено (немає способу)'
+    Add-StepIssue -id 7 -name (Get-LocalizedMessage 'language_pack_installation') -message 'Немає жодного доступного способу встановлення мовного пакету на цій системі'
+    Write-Log 'Крок пропущено: жоден спосіб встановлення мовного пакету недоступний на цій системі' -Color DarkYellow
 } else {
     Write-Log (Get-LocalizedMessage 'installing_language' $targetLanguageTag) -Color DarkYellow
     try {
-        Install-Language -Language $targetLanguageTag -CopyToSettings -ExcludeFeatures -ErrorAction Stop
+        if ($global:UseModernLanguageApi) {
+            Install-Language -Language $targetLanguageTag -CopyToSettings -ExcludeFeatures -ErrorAction Stop
+        } else {
+            # Універсальний DISM-шлях: базовий мовний пакет + додаткові
+            # компоненти (шрифти, мовлення, рукопис), якщо доступні саме на
+            # цій збірці. Базовий пакет - обов'язковий, решта - best-effort.
+            Add-WindowsCapability -Online -Name "Language.Basic~~~$targetLanguageTag~0.0.1.0" -ErrorAction Stop
+            foreach ($extra in @('Language.Fonts.Cyrl', 'Language.Handwriting', 'Language.OCR', 'Language.Speech', 'Language.TextToSpeech')) {
+                try {
+                    $capName = "$extra~~~$targetLanguageTag~0.0.1.0"
+                    $capInfo = Get-WindowsCapability -Online -Name $capName -ErrorAction SilentlyContinue
+                    if ($capInfo -and $capInfo.State -ne 'Installed') {
+                        Add-WindowsCapability -Online -Name $capName -ErrorAction Stop | Out-Null
+                    }
+                } catch {
+                    Write-DebugLog "Додатковий компонент $extra недоступний на цій збірці - пропущено"
+                }
+            }
+            $ll = Get-WinUserLanguageList
+            if (-not ($ll | Where-Object { $_.LanguageTag -eq $targetLanguageTag })) {
+                $ll.Add($targetLanguageTag)
+                Set-WinUserLanguageList -LanguageList $ll -Force -ErrorAction SilentlyContinue
+            }
+        }
         $targetLanguageInstalled = $false
         for ($i = 1; $i -le 15; $i++) {
             Start-Sleep -Seconds 3
             $global:UIState.SpinnerFrame++
-            if ($global:UseAnsi) { Render-UI }
-            if ((Get-InstalledLanguage | Out-String) -match $targetLanguageTag) { $targetLanguageInstalled = $true; break }
-            if ((Get-WinUserLanguageList | Out-String) -match $targetLanguageTag) { $targetLanguageInstalled = $true; break }
+            if ($global:UseAnsi) { Show-Frame }
+            if (Test-UkrainianLanguageInstalled) { $targetLanguageInstalled = $true; break }
         }
         if (-not $targetLanguageInstalled) {
             Set-StepStatus -id 7 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
@@ -959,10 +1074,9 @@ if ($targetLanguageInstalled) {
         }
     } catch {
         Set-StepStatus -id 7 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
-        Add-StepIssue -id 7 -name (Get-LocalizedMessage 'language_pack_installation') -message $_.Exception.Message
-        Write-Log (Get-LocalizedMessage 'installation_error' $_.Exception.Message) -Color DarkYellow
+        Add-StepIssue -id 7 -name (Get-LocalizedMessage 'language_pack_installation') -message (Get-FriendlyErrorMessage $_.Exception.Message)
+        Write-Log (Get-LocalizedMessage 'installation_error' (Get-FriendlyErrorMessage $_.Exception.Message)) -Color DarkYellow
     }
-}
 }
 #endregion
 
@@ -991,8 +1105,8 @@ try {
     Write-Log (Get-LocalizedMessage 'interface_language_set' 'uk-UA') -Color DarkGreen
 } catch {
     Set-StepStatus -id 8 -status 'skipped' -result (Get-LocalizedMessage 'status_partial')
-    Add-StepIssue -id 8 -name (Get-LocalizedMessage 'interface_language_setting') -message $_.Exception.Message
-    Write-Log (Get-LocalizedMessage 'interface_language_error' $_.Exception.Message) -Color DarkYellow
+    Add-StepIssue -id 8 -name (Get-LocalizedMessage 'interface_language_setting') -message (Get-FriendlyErrorMessage $_.Exception.Message)
+    Write-Log (Get-LocalizedMessage 'interface_language_error' (Get-FriendlyErrorMessage $_.Exception.Message)) -Color DarkYellow
 }
 }
 #endregion
@@ -1015,7 +1129,7 @@ try {
         Set-TimeZone -Id 'FLE Standard Time' -ErrorAction Stop
         Write-Log 'Часовий пояс встановлено: FLE Standard Time (Київ)' -Color DarkGreen
     } catch {
-        Write-Log "Не вдалося встановити часовий пояс: $($_.Exception.Message)" -Color DarkYellow
+        Write-Log "Не вдалося встановити часовий пояс: $(Get-FriendlyErrorMessage $_.Exception.Message)" -Color DarkYellow
     }
 
     # Перший день тижня - понеділок, символ валюти - гривня (₴), явно в реєстрі,
@@ -1031,8 +1145,8 @@ try {
     Write-Log (Get-LocalizedMessage 'regional_standards_set' 'uk-UA') -Color DarkGreen
 } catch {
     Set-StepStatus -id 9 -status 'skipped' -result (Get-LocalizedMessage 'status_partial')
-    Add-StepIssue -id 9 -name (Get-LocalizedMessage 'regional_formats_setting') -message $_.Exception.Message
-    Write-Log (Get-LocalizedMessage 'regional_formats_error' $_.Exception.Message) -Color DarkYellow
+    Add-StepIssue -id 9 -name (Get-LocalizedMessage 'regional_formats_setting') -message (Get-FriendlyErrorMessage $_.Exception.Message)
+    Write-Log (Get-LocalizedMessage 'regional_formats_error' (Get-FriendlyErrorMessage $_.Exception.Message)) -Color DarkYellow
 }
 }
 #endregion
@@ -1094,12 +1208,12 @@ try {
                 Remove-WindowsCapability -Online -Name $cap.Name -ErrorAction Stop | Out-Null
                 Write-Log "Видалено компонент: $($cap.Name)" -Color DarkYellow
             } catch {
-                Write-Log "Не вдалося видалити $($cap.Name): $($_.Exception.Message)" -Color DarkYellow
+                Write-Log "Не вдалося видалити $($cap.Name): $(Get-FriendlyErrorMessage $_.Exception.Message)" -Color DarkYellow
             }
         }
         if ($ruCapabilities.Count -eq 0) { Write-Log 'Додаткових ru-* компонентів (мовлення/рукопис/OCR) не знайдено' -Color DarkGreen }
     } catch {
-        Write-Log "Перевірку додаткових мовних компонентів пропущено: $($_.Exception.Message)" -Color DarkYellow
+        Write-Log "Перевірку додаткових мовних компонентів пропущено: $(Get-FriendlyErrorMessage $_.Exception.Message)" -Color DarkYellow
     }
 
     # 2) Кеш підказок під час набору тексту (може містити напрацьовані ru-слова).
@@ -1116,15 +1230,15 @@ try {
         }
         Write-Log 'Кеш підказок набору тексту очищено' -Color DarkGreen
     } catch {
-        Write-Log "Не вдалося очистити кеш підказок набору тексту: $($_.Exception.Message)" -Color DarkYellow
+        Write-Log "Не вдалося очистити кеш підказок набору тексту: $(Get-FriendlyErrorMessage $_.Exception.Message)" -Color DarkYellow
     }
 
     Set-StepStatus -id 10 -status 'success' -result (Get-LocalizedMessage 'layouts_set_result' @('uk-UA', $secondaryLanguageTag))
     Write-Log (Get-LocalizedMessage 'layout_cleanup_completed' @('uk-UA', $secondaryLanguageTag)) -Color DarkGreen
 } catch {
     Set-StepStatus -id 10 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
-    Add-StepIssue -id 10 -name (Get-LocalizedMessage 'derussification_layouts') -message $_.Exception.Message
-    Write-Log (Get-LocalizedMessage 'layout_cleanup_error' $_.Exception.Message) -Color DarkYellow
+    Add-StepIssue -id 10 -name (Get-LocalizedMessage 'derussification_layouts') -message (Get-FriendlyErrorMessage $_.Exception.Message)
+    Write-Log (Get-LocalizedMessage 'layout_cleanup_error' (Get-FriendlyErrorMessage $_.Exception.Message)) -Color DarkYellow
 }
 }
 #endregion
@@ -1208,12 +1322,19 @@ if ($WhatIf) {
         }
     } catch {
         Set-StepStatus -id 12 -status 'skipped' -result 'Помилка перевірки'
-        Write-Log "Не вдалося виконати перевірку результату: $($_.Exception.Message)" -Color DarkYellow
+        Write-Log "Не вдалося виконати перевірку результату: $(Get-FriendlyErrorMessage $_.Exception.Message)" -Color DarkYellow
     }
 }
 #endregion
 
 # === Completion ===
+try {
+    if ($global:UkrainizatorMutex) {
+        $global:UkrainizatorMutex.ReleaseMutex()
+        $global:UkrainizatorMutex.Dispose()
+    }
+} catch {}
+
 Show-ProgressBar -Percent 100 -Label (Get-LocalizedMessage 'all_done')
 
 try {
