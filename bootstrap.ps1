@@ -1,4 +1,4 @@
-# bootstrap.ps1 - завантажує КОНКРЕТНИЙ реліз Українізатора (не гілку main,
+﻿# bootstrap.ps1 - завантажує КОНКРЕТНИЙ реліз Українізатора (не гілку main,
 # яка може змінюватись у будь-яку мить) у тимчасову теку, перевіряє
 # контрольну суму архіву і запускає справжній ukrainizator.ps1 з диска.
 #
@@ -54,7 +54,9 @@ function Install-FromMirror {
     # без перевірки хешу (жодного .sha256 там немає) - лише щоб скрипт
     # взагалі зміг запуститись, якщо GitHub недоступний.
     Write-Host 'GitHub недоступний - пробуємо резервне дзеркало (jsDelivr)...' -ForegroundColor DarkYellow
-    $innerDir = Join-Path $destRoot 'Ukrainizator'
+    # Пишемо напряму в $destRoot (без зайвої вкладеної підтеки) - інакше
+    # виходить подвійне вкладення на кшталт Temp\Ukrainizator\Ukrainizator\...
+    $innerDir = $destRoot
     New-Item -ItemType Directory -Path (Join-Path $innerDir 'locales') -Force | Out-Null
 
     Invoke-WebRequest -Uri "$fallbackBaseUrl/ukrainizator.ps1" -OutFile (Join-Path $innerDir 'ukrainizator.ps1') -UseBasicParsing
@@ -83,8 +85,12 @@ try {
     }
 }
 
-$innerFolder = Get-ChildItem -Path $destRoot -Directory | Select-Object -First 1
-$scriptPath = Join-Path $innerFolder.FullName 'ukrainizator.ps1'
+$scriptPath = Join-Path $destRoot 'ukrainizator.ps1'
+if (-not (Test-Path $scriptPath)) {
+    # Шлях через реліз-архів розпаковується у підтеку (напр. Ukrainizator\Ukrainizator\)
+    $innerFolder = Get-ChildItem -Path $destRoot -Directory | Select-Object -First 1
+    if ($innerFolder) { $scriptPath = Join-Path $innerFolder.FullName 'ukrainizator.ps1' }
+}
 
 if (-not (Test-Path $scriptPath)) {
     Write-Host 'Не вдалося знайти ukrainizator.ps1 після завантаження.' -ForegroundColor Red
