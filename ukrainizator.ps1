@@ -518,58 +518,119 @@ function Show-Frame {
     $global:AnsiLinesDrawn = $lines.Count
 }
 
+function New-ChiptuneWav {
+    # Синтезує 16-біт моно WAV (чиста синусоїда - м'який, приємний тон,
+    # без різких гармонік square-хвилі) з послідовності нот. Звук реально
+    # йде через звукову карту, а не через легасі PC-спікер.
+    param(
+        [double[]]$Frequencies,   # Гц на кожну ноту, 0 = пауза
+        [int[]]$Durations,        # мс на кожну ноту (той самий розмір масиву)
+        [int]$SampleRate = 22050,
+        [double]$Volume = 0.26
+    )
+    $bitsPerSample = 16
+    $numChannels = 1
+    $byteRate = $SampleRate * $numChannels * $bitsPerSample / 8
+    $blockAlign = $numChannels * $bitsPerSample / 8
+
+    $totalSamples = 0
+    for ($n = 0; $n -lt $Durations.Count; $n++) { $totalSamples += [int]($SampleRate * $Durations[$n] / 1000.0) }
+    $dataSize = $totalSamples * $blockAlign
+
+    $ms = New-Object System.IO.MemoryStream
+    $bw = New-Object System.IO.BinaryWriter($ms)
+    $ascii = [System.Text.Encoding]::ASCII
+
+    $bw.Write($ascii.GetBytes('RIFF'))
+    $bw.Write([int32](36 + $dataSize))
+    $bw.Write($ascii.GetBytes('WAVE'))
+    $bw.Write($ascii.GetBytes('fmt '))
+    $bw.Write([int32]16)
+    $bw.Write([int16]1)
+    $bw.Write([int16]$numChannels)
+    $bw.Write([int32]$SampleRate)
+    $bw.Write([int32]$byteRate)
+    $bw.Write([int16]$blockAlign)
+    $bw.Write([int16]$bitsPerSample)
+    $bw.Write($ascii.GetBytes('data'))
+    $bw.Write([int32]$dataSize)
+
+    for ($n = 0; $n -lt $Frequencies.Count; $n++) {
+        $freq = $Frequencies[$n]
+        $count = [int]($SampleRate * $Durations[$n] / 1000.0)
+        $fadeLen = [Math]::Min(400, [int]($count / 3))
+        for ($i = 0; $i -lt $count; $i++) {
+            if ($freq -le 0) {
+                $bw.Write([int16]0)
+                continue
+            }
+            $t = $i / [double]$SampleRate
+            # Синусоїда з обертонами звучала м'яко, але "порожньо" - як ріг/дзвін
+            # (бракує характерного "ігрового" тембру). Справжній ретро-звук
+            # базується на прямокутній хвилі (багато непарних гармонік), але
+            # НЕ на її "сирій" версії (то було занадто різко). Тут - band-limited
+            # square: сума лише перших чотирьох непарних гармонік з спадною
+            # гучністю (1, 1/3, 1/5, 1/7) - справжній "8-bit" тембр без зайвої
+            # жорсткості необробленої square wave.
+            $val = $Volume * 1.3 * (
+                [Math]::Sin(2 * [Math]::PI * $freq * $t) +
+                (1.0 / 3) * [Math]::Sin(2 * [Math]::PI * $freq * 3 * $t) +
+                (1.0 / 5) * [Math]::Sin(2 * [Math]::PI * $freq * 5 * $t) +
+                (1.0 / 7) * [Math]::Sin(2 * [Math]::PI * $freq * 7 * $t)
+            )
+            if ($fadeLen -gt 0) {
+                if ($i -lt $fadeLen) { $val *= ($i / [double]$fadeLen) }
+                elseif ($i -gt ($count - $fadeLen)) { $val *= (($count - $i) / [double]$fadeLen) }
+            }
+            $bw.Write([int16]([Math]::Round($val * 32767)))
+        }
+    }
+    $bw.Flush()
+    $bytes = $ms.ToArray()
+    $bw.Dispose()
+    $ms.Dispose()
+    return $bytes
+}
+
+function Send-ChiptuneNotes {
+    param([double[]]$Frequencies, [int[]]$Durations)
+    $wavBytes = New-ChiptuneWav -Frequencies $Frequencies -Durations $Durations
+    $playStream = New-Object System.IO.MemoryStream(,$wavBytes)
+    $player = New-Object System.Media.SoundPlayer($playStream)
+    $player.PlaySync()
+    $playStream.Dispose()
+}
+
 function Invoke-Sound {
-    # Єдина "звукова палітра" скрипта - замість розрізнених окремих Beep().
-    # PC-спікер уміє лише один тон за раз, тому "мелодії" - це короткі
-    # послідовності нот. Виклики короткі (десятки-сотні мс), тож на UI не впливають.
+    # Єдина "звукова палітра" скрипта. Основний шлях - синтезований WAV через
+    # звукову карту (яскраво й чітко різні мелодії); якщо аудіопристрій
+    # недоступний (RDP без аудіо-переспрямування тощо) - запасний варіант
+    # через [Console]::Beep() з тими самими нотами, щоб хоч якийсь звук був.
     param(
         [ValidateSet('Startup','StepSuccess','StepSkipped','StepError','Fanfare','CountdownTick','Cancel','Lock')]
         [string]$Type,
         [int]$Variant = 0
     )
+    $freqs = @(); $durs = @()
+    switch ($Type) {
+        'Startup'      { $freqs = @(261, 329, 392, 523, 659);          $durs = @(55, 55, 55, 70, 140) }
+        'StepSuccess'  { $b = 659 + ($Variant * 15); $freqs = @($b, $b * 1.5); $durs = @(60, 140) }
+        'StepSkipped'  { $freqs = @(440);                                $durs = @(190) }
+        'StepError'    { $freqs = @(220, 175, 147);                     $durs = @(140, 140, 240) }
+        'Fanfare'      { $freqs = @(523, 659, 784, 1046, 784, 1046, 1318); $durs = @(110, 110, 110, 160, 110, 160, 380) }
+        'CountdownTick'{ $p = if ($Variant % 2 -eq 0) { 880 } else { 660 }; $freqs = @($p); $durs = @(45) }
+        'Cancel'       { $freqs = @(784, 587, 392);                     $durs = @(120, 120, 220) }
+        'Lock'         { $freqs = @(440, 349, 440, 349);                $durs = @(110, 110, 110, 160) }
+    }
     try {
-        switch ($Type) {
-            'Startup' {
-                # Коротка "заставка" на старті - висхідне тріо
-                [Console]::Beep(392, 60)   # G4
-                [Console]::Beep(523, 60)   # C5
-                [Console]::Beep(659, 100)  # E5
+        Send-ChiptuneNotes -Frequencies $freqs -Durations $durs
+    } catch {
+        try {
+            for ($n = 0; $n -lt $freqs.Count; $n++) {
+                if ($freqs[$n] -gt 0) { [Console]::Beep([int]$freqs[$n], $durs[$n]) }
             }
-            'StepSuccess' {
-                # "Монетка": два швидкі висхідні тони, трохи вищі з кожним кроком
-                $base = 420 + ($Variant * 25)
-                [Console]::Beep($base, 40)
-                [Console]::Beep([int]($base * 1.5), 90)
-            }
-            'StepSkipped' {
-                # Нейтральний одиночний "клац" - не радісно, не тривожно
-                [Console]::Beep(440, 60)
-            }
-            'StepError' {
-                # Низхідне "бз-бз"
-                [Console]::Beep(220, 120)
-                [Console]::Beep(180, 180)
-            }
-            'Fanfare' {
-                # Мажорне арпеджіо + фінальна трель на завершення всього прогону
-                [Console]::Beep(523, 130)   # C5
-                [Console]::Beep(659, 130)   # E5
-                [Console]::Beep(784, 130)   # G5
-                [Console]::Beep(1046, 220)  # C6
-                [Console]::Beep(1318, 300)  # E6
-            }
-            'CountdownTick' {
-                [Console]::Beep(880, 35)
-            }
-            'Cancel' {
-                [Console]::Beep(660, 80)
-                [Console]::Beep(440, 130)
-            }
-            'Lock' {
-                [Console]::Beep(220, 250)
-            }
-        }
-    } catch {}
+        } catch {}
+    }
 }
 
 function Set-StepStatus {
@@ -766,7 +827,7 @@ function Show-CountdownReboot {
     param([int]$Seconds = 15)
     for ($s = $Seconds; $s -gt 0; $s--) {
         Set-InfoPanel -Lines @("$(Get-LocalizedMessage 'rebooting') Перезавантаження через $s с... (натисніть будь-яку клавішу, щоб скасувати)")
-        Invoke-Sound -Type 'CountdownTick'
+        Invoke-Sound -Type 'CountdownTick' -Variant $s
         try {
             if ([Console]::KeyAvailable) {
                 [Console]::ReadKey($true) | Out-Null
@@ -958,8 +1019,32 @@ try {
     $osInfo = Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction Stop
     $global:WinBuild = [int]$osInfo.CurrentBuildNumber
     $global:WinDisplayVersion = if ($osInfo.DisplayVersion) { $osInfo.DisplayVersion } else { $osInfo.ReleaseId }
-    $global:WinProductName = $osInfo.ProductName
+    $rawProductName = $osInfo.ProductName
+    # Відомий нюанс реєстру Windows: ProductName нерідко й досі буквально каже
+    # "Windows 10 ..." навіть на справжній Windows 11 (build 22000+) - сама
+    # Microsoft не завжди оновлює цей рядок. Виправляємо назву за номером збірки,
+    # а не за тим, що написано в реєстрі, щоб не вводити користувача в оману.
+    if ($global:WinBuild -ge 22000 -and $rawProductName -match 'Windows 10') {
+        $global:WinProductName = $rawProductName -replace 'Windows 10', 'Windows 11'
+    } else {
+        $global:WinProductName = $rawProductName
+    }
     Write-Log "Виявлено: $($global:WinProductName), $($global:WinDisplayVersion) (build $($global:WinBuild))" -Color DarkGreen
+
+# Необов'язкова перевірка нової версії (тільки для локального запуску без
+# bootstrap.ps1, який завжди й так тягне найсвіжіший реліз). Ненав'язливо:
+# коротким таймаутом, без падіння скрипта, якщо немає інтернету чи API
+# недоступний - просто мовчки пропускаємо.
+try {
+    $releaseInfo = Invoke-RestMethod -Uri 'https://api.github.com/repos/sansej8989/Ukrainizator/releases/latest' `
+        -Headers @{ 'User-Agent' = 'Ukrainizator' } -TimeoutSec 3 -ErrorAction Stop
+    $latestVersion = $releaseInfo.tag_name -replace '^v', ''
+    if ($latestVersion -and ([version]$latestVersion -gt [version]$scriptVersion)) {
+        Write-Log "Доступна новіша версія: $latestVersion (у вас $scriptVersion) - https://github.com/sansej8989/Ukrainizator/releases/latest" -Color DarkYellow
+    }
+} catch {
+    Write-DebugLog "Перевірка нової версії пропущена: $($_.Exception.Message)"
+}
 } catch {
     $global:WinBuild = 0
     $global:WinDisplayVersion = 'невідомо'
@@ -1000,7 +1085,7 @@ if ($WhatIf) {
 Write-Log (Get-LocalizedMessage 'restore_point_creation')
 try {
     Enable-ComputerRestore -Drive "C:\" -ErrorAction SilentlyContinue
-    Checkpoint-Computer -Description "Before running Ukrainizator" -RestorePointType MODIFY_SETTINGS -ErrorAction Stop
+    Checkpoint-Computer -Description "Before running Ukrainizator" -RestorePointType MODIFY_SETTINGS -ErrorAction Stop -WarningAction SilentlyContinue
     Set-StepStatus -id 4 -status 'success' -result (Get-LocalizedMessage 'created')
     Write-Log (Get-LocalizedMessage 'restore_point_created') -Color DarkGreen
 } catch {
@@ -1027,8 +1112,8 @@ if ($Silent) {
 } else {
     Set-InfoPanel -Lines @(
         (Get-LocalizedMessage 'apply_to'),
-        "  [A] $(Get-LocalizedMessage 'all_users_recommended')",
-        "  [C] $(Get-LocalizedMessage 'current_user_only')"
+        "  $(Get-LocalizedMessage 'all_users_recommended')",
+        "  $(Get-LocalizedMessage 'current_user_only')"
     )
     $installMode = Show-Prompt -Text (Get-LocalizedMessage 'your_choice') -Default 'A'
     if ($installMode -notin @('A','a','All','ALL')) {
@@ -1039,7 +1124,7 @@ if ($Silent) {
         $modeText = (Get-LocalizedMessage 'all_users')
     }
     Set-StepStatus -id 5 -status 'success' -result $modeText
-    Write-Log "$(Get-LocalizedMessage 'selected_mode')$modeText" -Color DarkGreen
+    Write-Log "$(Get-LocalizedMessage 'selected_mode') $modeText" -Color DarkGreen
     Clear-InfoPanel
 }
 #endregion
@@ -1103,18 +1188,18 @@ if ($targetLanguageInstalled) {
     Write-Log (Get-LocalizedMessage 'installing_language' $targetLanguageTag) -Color DarkYellow
     try {
         if ($global:UseModernLanguageApi) {
-            Install-Language -Language $targetLanguageTag -CopyToSettings -ExcludeFeatures -ErrorAction Stop
+            Install-Language -Language $targetLanguageTag -CopyToSettings -ExcludeFeatures -ErrorAction Stop -WarningAction SilentlyContinue
         } else {
             # Універсальний DISM-шлях: базовий мовний пакет + додаткові
             # компоненти (шрифти, мовлення, рукопис), якщо доступні саме на
             # цій збірці. Базовий пакет - обов'язковий, решта - best-effort.
-            Add-WindowsCapability -Online -Name "Language.Basic~~~$targetLanguageTag~0.0.1.0" -ErrorAction Stop
+            Add-WindowsCapability -Online -Name "Language.Basic~~~$targetLanguageTag~0.0.1.0" -ErrorAction Stop -WarningAction SilentlyContinue
             foreach ($extra in @('Language.Fonts.Cyrl', 'Language.Handwriting', 'Language.OCR', 'Language.Speech', 'Language.TextToSpeech')) {
                 try {
                     $capName = "$extra~~~$targetLanguageTag~0.0.1.0"
                     $capInfo = Get-WindowsCapability -Online -Name $capName -ErrorAction SilentlyContinue
                     if ($capInfo -and $capInfo.State -ne 'Installed') {
-                        Add-WindowsCapability -Online -Name $capName -ErrorAction Stop | Out-Null
+                        Add-WindowsCapability -Online -Name $capName -ErrorAction Stop -WarningAction SilentlyContinue | Out-Null
                     }
                 } catch {
                     Write-DebugLog "Додатковий компонент $extra недоступний на цій збірці - пропущено"
@@ -1157,14 +1242,14 @@ if ($WhatIf) {
     Write-Log '[WhatIf] Було б встановлено мову інтерфейсу uk-UA' -Color DarkYellow
 } else {
 try {
-    Set-WinUILanguageOverride -Language 'uk-UA' -ErrorAction Stop
+    Set-WinUILanguageOverride -Language 'uk-UA' -ErrorAction Stop -WarningAction SilentlyContinue
     $langCode = '0422'
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\Language' -Name 'Default' -Value $langCode -ErrorAction Stop
     Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Nls\Language' -Name 'InstallLanguage' -Value $langCode -ErrorAction Stop
 
     if ($installMode -eq 'All') {
         try {
-            Copy-UserInternationalSettingsToSystem -WelcomeScreen $true -NewUser $true -ErrorAction Stop
+            Copy-UserInternationalSettingsToSystem -WelcomeScreen $true -NewUser $true -ErrorAction Stop -WarningAction SilentlyContinue
             Write-Log (Get-LocalizedMessage 'copied_settings_welcome_new_user') -Color DarkGreen
         } catch {
             Write-Log (Get-LocalizedMessage 'copying_settings_failed_win10') -Color DarkYellow
@@ -1188,10 +1273,10 @@ if ($WhatIf) {
     Write-Log '[WhatIf] Було б встановлено регіон uk-UA, часовий пояс, понеділок як перший день тижня' -Color DarkYellow
 } else {
 try {
-    Set-Culture -CultureInfo 'uk-UA' -ErrorAction Stop
-    Set-WinSystemLocale -SystemLocale 'uk-UA' -ErrorAction Stop
+    Set-Culture -CultureInfo 'uk-UA' -ErrorAction Stop -WarningAction SilentlyContinue
+    Set-WinSystemLocale -SystemLocale 'uk-UA' -ErrorAction Stop -WarningAction SilentlyContinue
     $geoId = 240
-    Set-WinHomeLocation -GeoId $geoId -ErrorAction Stop
+    Set-WinHomeLocation -GeoId $geoId -ErrorAction Stop -WarningAction SilentlyContinue
 
     # Часовий пояс України
     try {
@@ -1248,7 +1333,7 @@ try {
     $secondaryLang.InputMethodTips.Clear()
     $secondaryLang.InputMethodTips.Add($secondaryLangIMT)
 
-    Set-WinUserLanguageList -LanguageList $ll -Force -ErrorAction Stop
+    Set-WinUserLanguageList -LanguageList $ll -Force -ErrorAction Stop -WarningAction SilentlyContinue
 
     $preloadPath = 'HKCU:\Keyboard Layout\Preload'
     if (Test-Path $preloadPath) {
@@ -1365,12 +1450,28 @@ if ($WhatIf) {
         $sysLocale = (Get-WinSystemLocale -ErrorAction SilentlyContinue).Name
         [void]$checks.Add(@{ Name = 'Системна локаль'; Ok = ($sysLocale -eq 'uk-UA'); Detail = $sysLocale })
         $uiLang = (Get-WinUILanguageOverride -ErrorAction SilentlyContinue).Name
-        [void]$checks.Add(@{ Name = 'Мова інтерфейсу'; Ok = ($uiLang -eq 'uk-UA'); Detail = $uiLang })
+        # Windows іноді повертає скорочений тег "uk" замість "uk-UA" - це та сама мова,
+        # просто інший формат запису, тому приймаємо обидва варіанти.
+        [void]$checks.Add(@{ Name = 'Мова інтерфейсу'; Ok = ($uiLang -eq 'uk-UA' -or $uiLang -eq 'uk'); Detail = $uiLang })
         $culture = (Get-Culture).Name
         [void]$checks.Add(@{ Name = 'Регіональний формат'; Ok = ($culture -eq 'uk-UA'); Detail = $culture })
-        $llCheck = Get-WinUserLanguageList
-        $hasUk = [bool]($llCheck | Where-Object { $_.LanguageTag -eq 'uk-UA' })
-        $hasRu = [bool]($llCheck | Where-Object { $_.LanguageTag -match 'ru' })
+
+        # Get-WinUserLanguageList кешує результат на весь час життя процесу
+        # PowerShell - повторні виклики з паузою НЕ допомагають, бо це не
+        # затримка синхронізації, а кеш в межах поточного сеансу. Тому читаємо
+        # напряму з реєстру, куди Set-WinUserLanguageList реально записує дані -
+        # це відображає справжній поточний стан без кешування.
+        $hasUk = $false; $hasRu = $false
+        try {
+            $userProfileLangs = (Get-ItemProperty -Path 'HKCU:\Control Panel\International\User Profile' -Name 'Languages' -ErrorAction Stop).Languages
+            $hasUk = [bool]($userProfileLangs -contains 'uk-UA')
+            $hasRu = [bool]($userProfileLangs | Where-Object { $_ -match 'ru' })
+        } catch {
+            # Резервний варіант, якщо ключа реєстру ще немає - старий спосіб через cmdlet
+            $llCheck = Get-WinUserLanguageList
+            $hasUk = [bool]($llCheck | Where-Object { $_.LanguageTag -eq 'uk-UA' })
+            $hasRu = [bool]($llCheck | Where-Object { $_.LanguageTag -match 'ru' })
+        }
         [void]$checks.Add(@{ Name = 'Розкладка uk-UA присутня'; Ok = $hasUk; Detail = if ($hasUk) { 'так' } else { 'ні' } })
         [void]$checks.Add(@{ Name = 'Розкладку ru видалено'; Ok = (-not $hasRu); Detail = if ($hasRu) { 'ще є' } else { 'видалено' } })
         $geoId = (Get-WinHomeLocation -ErrorAction SilentlyContinue).GeoId

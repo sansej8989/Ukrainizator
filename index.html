@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Українізатор</title>
+<style>
+  :root {
+    --blue: #4692ff;
+    --gold: #ffd146;
+    --bg: #0f1420;
+    --panel: #161c2c;
+    --text: #e8ecf4;
+    --dim: #8b96a5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Cascadia Code', 'Consolas', 'Segoe UI', monospace, sans-serif;
+    padding: 24px;
+  }
+  .card {
+    max-width: 640px;
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid #232b3d;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 28px;
+    background: linear-gradient(90deg, var(--blue), var(--gold));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  p.subtitle { margin: 0 0 28px; color: var(--dim); font-size: 15px; }
+  .cmd-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #0a0e17;
+    border: 1px solid #232b3d;
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    overflow-x: auto;
+  }
+  .cmd-box code { color: var(--gold); white-space: nowrap; }
+  button {
+    flex-shrink: 0;
+    background: var(--blue);
+    color: #0a0e17;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.1s ease;
+  }
+  button:active { transform: scale(0.96); }
+  button.copied { background: var(--gold); }
+  .note {
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--dim);
+    line-height: 1.6;
+  }
+  .note b { color: var(--text); }
+  a { color: var(--blue); }
+  .links { margin-top: 24px; display: flex; gap: 16px; font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Українізатор</h1>
+    <p class="subtitle">Автоматична українізація Windows 10/11 в один прохід</p>
+
+    <div class="cmd-box">
+      <code id="cmd">irm https://sansej8989.github.io/Ukrainizator/bootstrap.ps1 | iex</code>
+      <button id="copyBtn" onclick="copyCmd()">Копіювати</button>
+    </div>
+
+    <p class="note">
+      Запускати у <b>PowerShell від імені адміністратора</b>.
+      Команда завантажує останній перевірений реліз (не гілку в розробці),
+      звіряє контрольну суму архіву й лише тоді запускає скрипт.
+    </p>
+
+    <div class="links">
+      <a href="https://github.com/sansej8989/Ukrainizator" target="_blank">Репозиторій</a>
+      <a href="https://github.com/sansej8989/Ukrainizator/releases" target="_blank">Усі релізи</a>
+      <a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank">Документація</a>
+    </div>
+  </div>
+
+<script>
+function copyCmd() {
+  const text = document.getElementById('cmd').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copyBtn');
+    const original = btn.textContent;
+    btn.textContent = 'Скопійовано!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+  });
+}
+</script>
+</body>
+</html>
