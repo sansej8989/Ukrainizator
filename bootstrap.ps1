@@ -1,9 +1,18 @@
-﻿# bootstrap.ps1 - завантажує КОНКРЕТНИЙ реліз Українізатора (не гілку main,
-# яка може змінюватись у будь-яку мить) у тимчасову теку, перевіряє
-# контрольну суму архіву і запускає справжній ukrainizator.ps1 з диска.
+﻿# bootstrap.ps1 - downloads a SPECIFIC release of Ukrainizator (not the
+# moving main branch) into a temp folder, verifies the archive checksum,
+# and runs the real ukrainizator.ps1 from disk.
 #
-# Використання:
+# Usage:
 #   irm https://sansej8989.github.io/Ukrainizator/bootstrap.ps1 | iex
+#
+# NOTE: this file is deliberately ASCII-only (no Cyrillic). When fetched
+# via irm/Invoke-RestMethod, PowerShell 5.1 decodes the response using the
+# server's declared charset - and GitHub Pages does not always declare
+# charset=utf-8 for .ps1 files, so non-ASCII bytes can get misdecoded and
+# break parsing before the script even runs. ASCII bytes are identical in
+# every common encoding, so this sidesteps the problem entirely. All the
+# actual Ukrainian UI lives in ukrainizator.ps1 itself, which is run as a
+# real local file (with a proper UTF-8 BOM) once downloaded - unaffected.
 
 $ErrorActionPreference = 'Stop'
 
@@ -11,11 +20,10 @@ $repoOwner  = 'sansej8989'
 $repoName   = 'Ukrainizator'
 $destRoot   = Join-Path $env:TEMP 'Ukrainizator'
 $zipPath    = Join-Path $env:TEMP 'ukrainizator_dl.zip'
-# Якщо GitHub API недоступний (мережеві обмеження) - резервний шлях через
-# jsDelivr (окремий CDN, що дзеркалить публічні GitHub-репозиторії; не
-# завжди має ідентичний хеш-файл, тому тут перевірка контрольної суми
-# пропускається - це свідомий компроміс "хоч якось запуститись" проти
-# "гарантовано перевірено").
+# Fallback mirror if GitHub itself is unreachable (network restrictions).
+# jsDelivr mirrors public GitHub repos; no separate checksum file is
+# available there, so integrity verification is skipped on this path -
+# a deliberate "still runs" vs "fully verified" tradeoff.
 $fallbackBaseUrl = "https://cdn.jsdelivr.net/gh/$repoOwner/$repoName@main"
 
 function Get-LatestReleaseInfo {
@@ -24,45 +32,39 @@ function Get-LatestReleaseInfo {
 }
 
 function Install-FromRelease {
-    Write-Host 'Перевірка останнього релізу...' -ForegroundColor Cyan
+    Write-Host 'Checking latest release...' -ForegroundColor Cyan
     $release = Get-LatestReleaseInfo
     $zipAsset  = $release.assets | Where-Object { $_.name -eq 'Ukrainizator.zip' }
     $hashAsset = $release.assets | Where-Object { $_.name -eq 'Ukrainizator.zip.sha256' }
 
-    if (-not $zipAsset) { throw 'У релізі не знайдено файл Ukrainizator.zip' }
+    if (-not $zipAsset) { throw 'Ukrainizator.zip not found in the latest release' }
 
-    Write-Host "Завантаження релізу $($release.tag_name)..." -ForegroundColor Cyan
+    Write-Host "Downloading release $($release.tag_name)..." -ForegroundColor Cyan
     Invoke-WebRequest -Uri $zipAsset.browser_download_url -OutFile $zipPath -UseBasicParsing
 
     if ($hashAsset) {
-        Write-Host 'Перевірка контрольної суми архіву...' -ForegroundColor Cyan
+        Write-Host 'Verifying archive checksum...' -ForegroundColor Cyan
         $expectedHash = (Invoke-RestMethod -Uri $hashAsset.browser_download_url -TimeoutSec 10).Trim().ToUpper()
         $actualHash = (Get-FileHash -Path $zipPath -Algorithm SHA256).Hash.ToUpper()
         if ($expectedHash -ne $actualHash) {
-            throw "Контрольна сума архіву НЕ збігається! Очікувано: $expectedHash, отримано: $actualHash. Завантаження скасовано."
+            throw "Archive checksum mismatch! Expected: $expectedHash, got: $actualHash. Aborting."
         }
-        Write-Host 'Контрольна сума збігається - файл цілий.' -ForegroundColor DarkGreen
+        Write-Host 'Checksum OK.' -ForegroundColor DarkGreen
     } else {
-        Write-Host 'Файл контрольної суми відсутній у релізі - перевірку пропущено.' -ForegroundColor DarkYellow
+        Write-Host 'No checksum file in this release - skipping verification.' -ForegroundColor DarkYellow
     }
 
     return $release.tag_name
 }
 
 function Install-FromMirror {
-    # Запасний шлях: качаємо потрібні файли поштучно напряму з jsDelivr,
-    # без перевірки хешу (жодного .sha256 там немає) - лише щоб скрипт
-    # взагалі зміг запуститись, якщо GitHub недоступний.
-    Write-Host 'GitHub недоступний - пробуємо резервне дзеркало (jsDelivr)...' -ForegroundColor DarkYellow
-    # Пишемо напряму в $destRoot (без зайвої вкладеної підтеки) - інакше
-    # виходить подвійне вкладення на кшталт Temp\Ukrainizator\Ukrainizator\...
-    $innerDir = $destRoot
-    New-Item -ItemType Directory -Path (Join-Path $innerDir 'locales') -Force | Out-Null
+    Write-Host 'GitHub unavailable - trying fallback mirror (jsDelivr)...' -ForegroundColor DarkYellow
+    New-Item -ItemType Directory -Path (Join-Path $destRoot 'locales') -Force | Out-Null
 
-    Invoke-WebRequest -Uri "$fallbackBaseUrl/ukrainizator.ps1" -OutFile (Join-Path $innerDir 'ukrainizator.ps1') -UseBasicParsing
-    Invoke-WebRequest -Uri "$fallbackBaseUrl/locales/uk-UA.json" -OutFile (Join-Path $innerDir 'locales/uk-UA.json') -UseBasicParsing
-    Invoke-WebRequest -Uri "$fallbackBaseUrl/locales/en-US.json" -OutFile (Join-Path $innerDir 'locales/en-US.json') -UseBasicParsing
-    Write-Host 'Завантажено через резервне дзеркало (без перевірки хешу).' -ForegroundColor DarkYellow
+    Invoke-WebRequest -Uri "$fallbackBaseUrl/ukrainizator.ps1" -OutFile (Join-Path $destRoot 'ukrainizator.ps1') -UseBasicParsing
+    Invoke-WebRequest -Uri "$fallbackBaseUrl/locales/uk-UA.json" -OutFile (Join-Path $destRoot 'locales/uk-UA.json') -UseBasicParsing
+    Invoke-WebRequest -Uri "$fallbackBaseUrl/locales/en-US.json" -OutFile (Join-Path $destRoot 'locales/en-US.json') -UseBasicParsing
+    Write-Host 'Downloaded via fallback mirror (unverified).' -ForegroundColor DarkYellow
     return 'main (mirror, unverified)'
 }
 
@@ -75,27 +77,27 @@ try {
     Expand-Archive -Path $zipPath -DestinationPath $destRoot -Force
     Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
 } catch {
-    Write-Host "Не вдалося завантажити реліз через GitHub: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Could not download release from GitHub: $($_.Exception.Message)" -ForegroundColor Red
     try {
         $usedVersion = Install-FromMirror
     } catch {
-        Write-Host "Резервне дзеркало теж недоступне: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host 'Перевірте інтернет-з''єднання і спробуйте ще раз.' -ForegroundColor Red
+        Write-Host "Fallback mirror also unavailable: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host 'Check your internet connection and try again.' -ForegroundColor Red
         exit 1
     }
 }
 
 $scriptPath = Join-Path $destRoot 'ukrainizator.ps1'
 if (-not (Test-Path $scriptPath)) {
-    # Шлях через реліз-архів розпаковується у підтеку (напр. Ukrainizator\Ukrainizator\)
+    # Release-archive path extracts into a subfolder (e.g. Ukrainizator\Ukrainizator\)
     $innerFolder = Get-ChildItem -Path $destRoot -Directory | Select-Object -First 1
     if ($innerFolder) { $scriptPath = Join-Path $innerFolder.FullName 'ukrainizator.ps1' }
 }
 
 if (-not (Test-Path $scriptPath)) {
-    Write-Host 'Не вдалося знайти ukrainizator.ps1 після завантаження.' -ForegroundColor Red
+    Write-Host 'Could not find ukrainizator.ps1 after download.' -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Запуск версії: $usedVersion" -ForegroundColor DarkGreen
+Write-Host "Launching version: $usedVersion" -ForegroundColor DarkGreen
 & $scriptPath @args
