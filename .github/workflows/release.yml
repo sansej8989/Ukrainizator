@@ -32,14 +32,14 @@ jobs:
 
       - name: Package release archive
         run: |
-          mkdir -p dist/Ukrainizator
-          cp ukrainizator.ps1 dist/Ukrainizator/
-          cp ukrainizator.ps1.sha256 dist/Ukrainizator/
-          cp bootstrap.ps1 dist/Ukrainizator/ 2>/dev/null || true
-          cp run_AUTO.bat dist/Ukrainizator/ 2>/dev/null || true
-          cp run_MANUAL.bat dist/Ukrainizator/ 2>/dev/null || true
-          cp -r locales dist/Ukrainizator/
-          cd dist && zip -r ../Ukrainizator.zip Ukrainizator
+          mkdir -p dist
+          cp ukrainizator.ps1 dist/
+          cp ukrainizator.ps1.sha256 dist/
+          cp bootstrap.ps1 dist/ 2>/dev/null || true
+          cp run_AUTO.bat dist/ 2>/dev/null || true
+          cp run_MANUAL.bat dist/ 2>/dev/null || true
+          cp -r locales dist/
+          cd dist && zip -r ../Ukrainizator.zip .
 
       - name: Generate SHA-256 for the release archive
         run: sha256sum Ukrainizator.zip | awk '{print $1}' > Ukrainizator.zip.sha256
