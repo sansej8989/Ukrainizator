@@ -1,4 +1,4 @@
-﻿# Ukrainizator v5.0.0
+﻿# Ukrainizator v5.0.1
 # ============================================================
 # Windows Ukrainian language setup script (Modern UI)
 # ============================================================
@@ -225,7 +225,7 @@ function Get-FriendlyErrorMessage {
 #endregion
 
 #region === Settings & State ===
-$scriptVersion = '5.0.0'
+$scriptVersion = '5.0.1'
 $logDir = Join-Path $PSScriptRoot 'log'
 if (-not (Test-Path $logDir)) { New-Item -Path $logDir -ItemType Directory -Force | Out-Null }
 # Не смітимо в корені теки: усі логи йдуть у log/, лишаємо 3 останні (включно з новим).
