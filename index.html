@@ -137,7 +137,7 @@
   </p>
 
   <div class="cmd-box">
-    <code id="cmd">irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1 | iex</code>
+    <code id="cmd">завантаження...</code>
     <button id="copyBtn" onclick="copyCmd()">Копіювати</button>
   </div>
   <p class="cmd-hint">
@@ -234,6 +234,19 @@
 </div>
 
 <script>
+// Єдине джерело правди - config.json у корені репозиторію. Якщо адреса
+// колись зміниться (перейменування репо, інший формат бутстрапа тощо) -
+// правиться лише там, а ця сторінка й README підхоплюють автоматично.
+fetch('./config.json')
+  .then(r => r.json())
+  .then(cfg => {
+    document.getElementById('cmd').textContent = cfg.installCommand;
+  })
+  .catch(() => {
+    document.getElementById('cmd').textContent =
+      'irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1 | iex';
+  });
+
 function copyCmd() {
   const text = document.getElementById('cmd').textContent;
   navigator.clipboard.writeText(text).then(() => {
