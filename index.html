@@ -3,105 +3,235 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Українізатор</title>
+<title>Українізатор — автоматична українізація Windows</title>
+<meta name="description" content="Скрипт для автоматичної українізації Windows 10/11: мовний пакет, регіон, розкладки, дерусифікація — в один прохід.">
 <style>
   :root {
     --blue: #4692ff;
     --gold: #ffd146;
-    --bg: #0f1420;
-    --panel: #161c2c;
+    --green: #3cde8d;
+    --red: #ff5a5f;
+    --bg: #0b0f18;
+    --panel: #131a29;
+    --panel2: #0e1420;
+    --border: #212a3d;
     --text: #e8ecf4;
     --dim: #8b96a5;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     background: var(--bg);
     color: var(--text);
     font-family: 'Cascadia Code', 'Consolas', 'Segoe UI', monospace, sans-serif;
-    padding: 24px;
+    line-height: 1.5;
   }
-  .card {
-    max-width: 640px;
-    width: 100%;
-    background: var(--panel);
-    border: 1px solid #232b3d;
-    border-radius: 16px;
-    padding: 40px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  .wrap { max-width: 880px; margin: 0 auto; padding: 56px 24px 80px; }
+
+  /* Hero */
+  .badges { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .badge {
+    font-size: 12px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--dim); background: var(--panel);
   }
+  .badge.ok { color: var(--green); border-color: rgba(60,222,141,0.35); }
   h1 {
-    margin: 0 0 4px;
-    font-size: 28px;
+    margin: 0 0 8px; font-size: 40px; letter-spacing: -0.02em;
     background: linear-gradient(90deg, var(--blue), var(--gold));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  p.subtitle { margin: 0 0 28px; color: var(--dim); font-size: 15px; }
+  p.subtitle { margin: 0 0 32px; color: var(--dim); font-size: 16px; max-width: 560px; }
+
+  /* Command box */
   .cmd-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: #0a0e17;
-    border: 1px solid #232b3d;
-    border-radius: 10px;
-    padding: 14px 16px;
-    font-size: 14px;
-    overflow-x: auto;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; font-size: 14px; overflow-x: auto; margin-bottom: 10px;
   }
   .cmd-box code { color: var(--gold); white-space: nowrap; }
   button {
-    flex-shrink: 0;
-    background: var(--blue);
-    color: #0a0e17;
-    border: none;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-weight: 600;
-    font-size: 13px;
-    cursor: pointer;
-    transition: transform 0.1s ease;
+    flex-shrink: 0; background: var(--blue); color: #0a0e17; border: none;
+    border-radius: 8px; padding: 9px 16px; font-weight: 600; font-size: 13px;
+    cursor: pointer; transition: transform 0.1s ease;
   }
   button:active { transform: scale(0.96); }
   button.copied { background: var(--gold); }
-  .note {
-    margin-top: 18px;
-    font-size: 13px;
-    color: var(--dim);
-    line-height: 1.6;
+  .cmd-hint { font-size: 13px; color: var(--dim); margin-bottom: 40px; }
+  .cmd-hint b { color: var(--text); }
+
+  /* Section headers */
+  h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--dim); margin: 0 0 18px; font-weight: 600;
   }
-  .note b { color: var(--text); }
-  a { color: var(--blue); }
-  .links { margin-top: 24px; display: flex; gap: 16px; font-size: 13px; }
+  section { margin-bottom: 48px; }
+
+  /* Feature grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .feature {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .feature .icon { font-size: 18px; margin-bottom: 8px; }
+  .feature .title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  .feature .desc { font-size: 12.5px; color: var(--dim); }
+
+  /* Terminal preview */
+  .terminal {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; font-size: 12.5px; overflow-x: auto;
+  }
+  .terminal .step { display: flex; gap: 10px; padding: 2px 0; white-space: nowrap; }
+  .terminal .ok { color: var(--green); }
+  .terminal .num { color: var(--dim); width: 20px; flex-shrink: 0; }
+  .terminal .name { flex: 1; min-width: 220px; }
+  .terminal .result { color: var(--dim); }
+
+  /* Requirements list */
+  ul.reqs { list-style: none; padding: 0; margin: 0; }
+  ul.reqs li {
+    display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 13.5px; color: var(--dim);
+  }
+  ul.reqs li:last-child { border-bottom: none; }
+  ul.reqs li b { color: var(--text); min-width: 150px; flex-shrink: 0; }
+
+  /* Alt install */
+  .alt-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .alt-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; font-size: 13px;
+  }
+  .alt-card .title { font-weight: 600; margin-bottom: 6px; }
+  .alt-card a { color: var(--blue); font-size: 12.5px; }
+
+  a { color: var(--blue); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .links { display: flex; gap: 20px; font-size: 13.5px; flex-wrap: wrap; }
+
+  footer {
+    margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border);
+    font-size: 12.5px; color: var(--dim); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 30px; }
+    .alt-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Українізатор</h1>
-    <p class="subtitle">Автоматична українізація Windows 10/11 в один прохід</p>
+<div class="wrap">
 
-    <div class="cmd-box">
-      <code id="cmd">irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1 | iex</code>
-      <button id="copyBtn" onclick="copyCmd()">Копіювати</button>
-    </div>
-
-    <p class="note">
-      Запускати у <b>PowerShell від імені адміністратора</b>.
-      Команда завантажує останній перевірений реліз (не гілку в розробці),
-      звіряє контрольну суму архіву й лише тоді запускає скрипт.
-    </p>
-
-    <div class="links">
-      <a href="https://github.com/sansej8989/Ukrainizator" target="_blank">Репозиторій</a>
-      <a href="https://github.com/sansej8989/Ukrainizator/releases" target="_blank">Усі релізи</a>
-      <a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank">Документація</a>
-    </div>
+  <div class="badges">
+    <span class="badge ok">v5.0.1</span>
+    <span class="badge">Windows 10 / 11</span>
+    <span class="badge">PowerShell 5.1+</span>
+    <span class="badge">MIT</span>
   </div>
+
+  <h1>Українізатор</h1>
+  <p class="subtitle">
+    Автоматична українізація Windows в один прохід: мовний пакет, інтерфейс,
+    регіональні стандарти, розкладки й дерусифікація — 12 кроків, один запуск.
+  </p>
+
+  <div class="cmd-box">
+    <code id="cmd">irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1 | iex</code>
+    <button id="copyBtn" onclick="copyCmd()">Копіювати</button>
+  </div>
+  <p class="cmd-hint">
+    Запускати в PowerShell <b>від імені адміністратора</b>. Завантажує останній
+    перевірений реліз (не гілку в розробці), звіряє контрольну суму архіву й лише
+    тоді запускає скрипт із диска.
+  </p>
+
+  <section>
+    <h2>Що робить</h2>
+    <div class="grid">
+      <div class="feature">
+        <div class="icon">🇺🇦</div>
+        <div class="title">Повна українізація</div>
+        <div class="desc">Мовний пакет, інтерфейс, регіон, часовий пояс, валюта ₴, розкладки — за один прогін.</div>
+      </div>
+      <div class="feature">
+        <div class="icon">🧹</div>
+        <div class="title">Глибока дерусифікація</div>
+        <div class="desc">Прибирає ru-розкладку та додаткові ru-компоненти: мовлення, рукопис, OCR.</div>
+      </div>
+      <div class="feature">
+        <div class="icon">↩️</div>
+        <div class="title">Відкат в один клік</div>
+        <div class="desc">Знімок налаштувань перед стартом і <code>-Revert</code> для миттєвого повернення.</div>
+      </div>
+      <div class="feature">
+        <div class="icon">🛡️</div>
+        <div class="title">Безпечно за задумом</div>
+        <div class="desc">Точка відновлення, перевірка цілісності скрипта (SHA-256), захист від паралельного запуску.</div>
+      </div>
+      <div class="feature">
+        <div class="icon">🖥️</div>
+        <div class="title">Будь-яка збірка Windows</div>
+        <div class="desc">Автоматичний вибір способу встановлення мови: сучасний API або запасний DISM-шлях.</div>
+      </div>
+      <div class="feature">
+        <div class="icon">⚙️</div>
+        <div class="title">Тихий режим для флоту</div>
+        <div class="desc"><code>-Silent -Mode All</code>, <code>-WhatIf</code> для перегляду, віддалений запуск на список ПК.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Як це виглядає</h2>
+    <div class="terminal">
+      <div class="step"><span class="ok">✓</span><span class="num">1.</span><span class="name">Перевірка прав адміністратора</span><span class="result">OK</span></div>
+      <div class="step"><span class="ok">✓</span><span class="num">4.</span><span class="name">Точка відновлення</span><span class="result">Створено</span></div>
+      <div class="step"><span class="ok">✓</span><span class="num">7.</span><span class="name">Встановлення мовного пакету</span><span class="result">uk-UA</span></div>
+      <div class="step"><span class="ok">✓</span><span class="num">10.</span><span class="name">Дерусифікація та розкладки</span><span class="result">uk-UA + en-US (без RU)</span></div>
+      <div class="step"><span class="ok">✓</span><span class="num">12.</span><span class="name">Перевірка результату</span><span class="result">6/6 OK</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Вимоги</h2>
+    <ul class="reqs">
+      <li><b>ОС</b> Windows 10 або Windows 11, будь-яка редакція крім Home (обмеження самої Microsoft на Language Packs)</li>
+      <li><b>PowerShell</b> версія 5.1 або новіша (вбудована в сучасні Windows)</li>
+      <li><b>Права</b> адміністратор</li>
+      <li><b>Інтернет</b> потрібен для завантаження мовного пакету й самого релізу</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Інші способи встановлення</h2>
+    <div class="alt-grid">
+      <div class="alt-card">
+        <div class="title">📦 Вручну</div>
+        Завантажте останній реліз і запустіть <code>Start_MANUAL.bat</code> (з питаннями) або <code>Start_AUTO.bat</code> (тихий режим).
+        <br><a href="https://github.com/sansej8989/Ukrainizator/releases/latest" target="_blank">Завантажити реліз →</a>
+      </div>
+      <div class="alt-card">
+        <div class="title">🖧 На кілька машин</div>
+        <code>.\ukrainizator.ps1 -ComputerName PC1,PC2 -Credential (Get-Credential)</code> — розгортання через PS Remoting.
+        <br><a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank">Детальніше в README →</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="links">
+    <a href="https://github.com/sansej8989/Ukrainizator" target="_blank">Репозиторій</a>
+    <a href="https://github.com/sansej8989/Ukrainizator/releases" target="_blank">Усі релізи</a>
+    <a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank">Документація</a>
+    <a href="https://github.com/sansej8989/Ukrainizator/issues" target="_blank">Повідомити про проблему</a>
+  </div>
+
+  <footer>
+    <span>Українізатор — персональний проєкт, з відкритим кодом.</span>
+    <span id="year"></span>
+  </footer>
+
+</div>
 
 <script>
 function copyCmd() {
@@ -114,6 +244,7 @@ function copyCmd() {
     setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
   });
 }
+document.getElementById('year').textContent = '© ' + new Date().getFullYear();
 </script>
 </body>
 </html>
