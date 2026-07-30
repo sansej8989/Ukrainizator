@@ -1,0 +1,66 @@
+<!--
+  ПЕРЕНОСНИЙ ШАБЛОН - HTML-віджет "Підтримати автора"
+  =====================================================
+  Вставте цей блок у будь-яку HTML-сторінку (усередині <body>).
+  Редагувати треба ЛИШЕ об'єкт SUPPORT_CONFIG нижче - решта підтягується
+  автоматично. Самодостатній: своя розмітка + стилі, не залежить від
+  іншого CSS на сторінці (класи мають префікс support-, конфліктів не буде).
+
+  Заповніть посилання, яких не використовуєте - лишіть null, кнопка сама
+  не відобразиться.
+-->
+<div id="support-widget"></div>
+
+<style>
+  .support-card {
+    max-width: 420px; font-family: 'Cascadia Code','Consolas','Segoe UI',monospace,sans-serif;
+    background: #131a29; border: 1px solid #212a3d; border-radius: 12px;
+    padding: 20px 22px; color: #e8ecf4;
+  }
+  .support-card .title { font-weight: 600; font-size: 15px; margin-bottom: 6px; }
+  .support-card .desc { font-size: 13px; color: #8b96a5; margin-bottom: 14px; }
+  .support-card .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .support-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    text-decoration: none; color: #0a0e17; transition: transform 0.1s ease;
+  }
+  .support-btn:hover { transform: translateY(-1px); }
+  .support-btn.mono { background: #ffd146; }
+  .support-btn.paypal { background: #4692ff; color: #fff; }
+  .support-btn.crypto { background: #f7931a; }
+</style>
+
+<script>
+(function () {
+  // ЄДИНЕ МІСЦЕ РЕДАГУВАННЯ - заповніть своїми даними, null = кнопка не показується
+  const SUPPORT_CONFIG = {
+    monobankJarUrl: null,      // напр. "https://send.monobank.ua/XXXXXXXXXX"
+    paypalHandle: null,        // напр. "yourname" (без https://paypal.me/)
+    cryptoAddress: null,       // напр. BTC-адреса
+    cryptoLabel: 'BTC',
+    title: '☕ Підтримати автора',
+    description: 'Якщо цей проєкт виявився корисним — можна пригостити кавою чи чаєм.'
+  };
+
+  const buttons = [];
+  if (SUPPORT_CONFIG.monobankJarUrl) {
+    buttons.push(`<a class="support-btn mono" href="${SUPPORT_CONFIG.monobankJarUrl}" target="_blank">Monobank банка</a>`);
+  }
+  if (SUPPORT_CONFIG.paypalHandle) {
+    buttons.push(`<a class="support-btn paypal" href="https://paypal.me/${SUPPORT_CONFIG.paypalHandle}" target="_blank">PayPal</a>`);
+  }
+  if (SUPPORT_CONFIG.cryptoAddress) {
+    buttons.push(`<a class="support-btn crypto" href="bitcoin:${SUPPORT_CONFIG.cryptoAddress}" target="_blank">${SUPPORT_CONFIG.cryptoLabel}</a>`);
+  }
+
+  if (buttons.length > 0) {
+    document.getElementById('support-widget').innerHTML = `
+      <div class="support-card">
+        <div class="title">${SUPPORT_CONFIG.title}</div>
+        <div class="desc">${SUPPORT_CONFIG.description}</div>
+        <div class="buttons">${buttons.join('')}</div>
+      </div>`;
+  }
+})();
+</script>
