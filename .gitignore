@@ -3,3 +3,13 @@ backup/*.json
 !backup/.gitkeep
 !log/.gitkeep
 run_omniroute.bat
+
+# Артефакти локальної збірки релізу (release.yml генерує їх на CI;
+# якщо колись прогонятимете ті самі команди у себе - не мають потрапити в git)
+dist/
+Ukrainizator.zip
+Ukrainizator.zip.sha256
+ukrainizator.ps1.sha256
+
+# Особисті налаштування редактора
+.vscode/

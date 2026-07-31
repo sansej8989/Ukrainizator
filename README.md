@@ -1,6 +1,6 @@
 # 🇺🇦 Українізатор
 
-![version](https://img.shields.io/badge/версія-5.0.1-4692ff?style=flat-square)
+![version](https://img.shields.io/badge/версія-5.0.2-4692ff?style=flat-square)
 ![platform](https://img.shields.io/badge/Windows-10%20%2F%2011-4692ff?style=flat-square)
 ![powershell](https://img.shields.io/badge/PowerShell-5.1%2B-4692ff?style=flat-square)
 ![license](https://img.shields.io/badge/license-MIT-ffd146?style=flat-square)
@@ -229,13 +229,27 @@ irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1
 
 ```
 Ukrainizator/
-├── ukrainizator.ps1              # основний скрипт
-├── Start_AUTO.bat                # тихий unattended-запуск
-├── Start_MANUAL.bat              # інтерактивний запуск
-├── ukrainizator.ps1.sha256       # (опційно) контрольна сума для перевірки цілісності
+├── .github/
+│   └── workflows/
+│       ├── release.yml            # автозбірка релізу + SHA-256 при пуші тегу v*
+│       └── sync-install-command.yml  # синхронізує README з config.json
+├── .gitignore
+├── .nojekyll                      # вимикає обробку Jekyll для GitHub Pages
+├── README.md
+├── config.json                    # єдине джерело правди для команди встановлення
+├── index.html                     # сторінка проєкту на GitHub Pages
+├── bootstrap.ps1                  # завантажувач для `irm ... | iex`
+├── ukrainizator.ps1                # основний скрипт
+├── ukrainizator.ps1.sha256         # (генерується при релізі) контрольна сума для перевірки цілісності
+├── Start_AUTO.bat                 # тихий unattended-запуск
+├── Start_MANUAL.bat               # інтерактивний запуск
 ├── locales/
 │   ├── uk-UA.json
 │   └── en-US.json
+├── templates/                     # переносні шаблони для ІНШИХ проєктів (не лише цього)
+│   ├── README.md
+│   ├── SUPPORT_SECTION.md
+│   └── support-widget.html
 ├── log/                           # створюється автоматично, лишає 3 останні лог-файли
 └── backup/                        # створюється автоматично, лишає 5 останніх знімків для -Revert
 ```
@@ -276,6 +290,7 @@ git push origin v5.1.0
 
 ## Історія версій
 
+- **v5.0.2** — наведення ладу в репозиторії: виправлено нестиковку назв лаунчерів (`run_*.bat` → `Start_*.bat`, через яку реліз-архів не підхоплював `.bat`-файли), переносні шаблони підтримки перенесено в `templates/`, оновлено `.gitignore` (артефакти локальної збірки, `ukrainizator.ps1.sha256`), додано підтримку двох банків (Monobank + Приват24) з реальними бренд-кольорами кнопок, `SUPPORT_SECTION.md`-шаблон оновлено під наявні способи оплати.
 - **v5.0.1** — інфраструктура релізів: GitHub Actions (автозбірка релізу, SHA-256), `bootstrap.ps1` для встановлення одним рядком (з перевіркою хешу й резервним дзеркалом через jsDelivr), сторінка на GitHub Pages, перевірка нової версії при старті скрипта; виправлено пакування архіву (без зайвої вкладеної теки) і кодування `bootstrap.ps1` (ASCII + без BOM, щоб коректно виконувався через `irm | iex`).
 - **v5.0.0** — виправлено неапробовані дієслова командлетів (`Build-Frame`→`New-Frame`, `Render-UI`→`Show-Frame`); ротація логів у `log/` (3 останні); людяні повідомлення про типові помилки; захист від паралельного запуску (м'ютекс); універсальна сумісність зі збірками Windows через DISM-запасний шлях.
 - **v4.2.0** — 24-бітна кольорова палітра, градієнтний прогрес-бар, двоколірний заголовок.
