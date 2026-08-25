@@ -474,7 +474,7 @@
 
   <div class="hero-header">
     <div class="badges">
-      <span class="badge ok">v5.0.4</span>
+      <span class="badge ok">v5.1.0</span>
       <span class="badge">Windows 10 / 11</span>
       <span class="badge">PowerShell 5.1+</span>
       <span class="badge">MIT</span>
@@ -559,7 +559,7 @@
       <div class="feature">
         <div class="icon">↩️</div>
         <div class="title" data-i18n="featureRevert">Відкат в один клік</div>
-        <div class="desc" data-i18n="featureRevertDesc">Знімок налаштувань перед стартом і <code>-Revert</code> для миттєвого повернення.</div>
+        <div class="desc" data-i18n="featureRevertDesc">Розширений <code>-Revert</code>: повне відновлення локалі, мов і розкладок із JSON-знімка + підсумковий звіт.</div>
       </div>
       <div class="feature">
         <div class="icon">🛡️</div>
@@ -575,6 +575,21 @@
         <div class="icon">⚙️</div>
         <div class="title" data-i18n="featureSilent">Тихий режим для флоту</div>
         <div class="desc" data-i18n="featureSilentDesc"><code>-Silent -Mode All</code>, <code>-WhatIf</code> для перегляду, віддалений запуск на список ПК.</div>
+      </div>
+      <div class="feature">
+        <div class="icon">💻</div>
+        <div class="title" data-i18n="featureMenu">Інтерактивне CLI-меню</div>
+        <div class="desc" data-i18n="featureMenuDesc">Вибір точного сценарію: повна українізація, тільки мовні пакети, тільки розкладки, дерусифікація або відкат.</div>
+      </div>
+      <div class="feature">
+        <div class="icon">🔍</div>
+        <div class="title" data-i18n="featurePreflight">Pre-flight аудит</div>
+        <div class="desc" data-i18n="featurePreflightDesc">Автоматична перевірка інтернету, вільного місця на диску та служби відновлення перед будь-якими змінами.</div>
+      </div>
+      <div class="feature">
+        <div class="icon">🧰</div>
+        <div class="title" data-i18n="featureApps">Локалізація стороннього ПЗ</div>
+        <div class="desc" data-i18n="featureAppsDesc">Автоматичне налаштування української мови у VS Code (<code>locale: uk</code>) та Git (<code>i18n.commitEncoding utf-8</code>).</div>
       </div>
     </div>
   </section>
@@ -701,7 +716,13 @@ const translations = {
     featureDerus: 'Глибока дерусифікація',
     featureDerusDesc: 'Прибирає ru-розкладку та додаткові ru-компоненти: мовлення, рукопис, OCR.',
     featureRevert: 'Відкат в один клік',
-    featureRevertDesc: 'Знімок налаштувань перед стартом і <code>-Revert</code> для миттєвого повернення.',
+    featureRevertDesc: 'Розширений <code>-Revert</code>: повне відновлення локалі, мов і розкладок із JSON-знімка + підсумковий звіт.',
+    featureMenu: 'Інтерактивне CLI-меню',
+    featureMenuDesc: 'Вибір точного сценарію: повна українізація, тільки мовні пакети, тільки розкладки, дерусифікація або відкат.',
+    featurePreflight: 'Pre-flight аудит',
+    featurePreflightDesc: 'Автоматична перевірка інтернету, вільного місця на диску та служби відновлення перед будь-якими змінами.',
+    featureApps: 'Локалізація стороннього ПЗ',
+    featureAppsDesc: 'Автоматичне налаштування української мови у VS Code (<code>locale: uk</code>) та Git (<code>i18n.commitEncoding utf-8</code>).',
     featureSafe: 'Безпечно за задумом',
     featureSafeDesc: 'Точка відновлення, перевірка цілісності скрипта (SHA-256), захист від паралельного запуску.',
     featureAny: 'Будь-яка збірка Windows',
@@ -751,7 +772,13 @@ const translations = {
     featureDerus: 'Deep derussification',
     featureDerusDesc: 'Removes ru-layout and extra ru-components: speech, handwriting, OCR.',
     featureRevert: 'One-click revert',
-    featureRevertDesc: 'Snapshot of settings before start and <code>-Revert</code> for instant rollback.',
+    featureRevertDesc: 'Enhanced <code>-Revert</code>: full restore of locale, languages, and layouts from a JSON snapshot + summary report.',
+    featureMenu: 'Interactive CLI menu',
+    featureMenuDesc: 'Pick an exact scenario: full Ukrainization, language packs only, layouts only, derussification, or rollback.',
+    featurePreflight: 'Pre-flight audit',
+    featurePreflightDesc: 'Automatic checks of internet access, free disk space, and the restore service before any changes.',
+    featureApps: 'Third-party app localization',
+    featureAppsDesc: 'Automatically sets Ukrainian in VS Code (<code>locale: uk</code>) and Git (<code>i18n.commitEncoding utf-8</code>).',
     featureSafe: 'Safe by design',
     featureSafeDesc: 'Restore point, script integrity check (SHA-256), protection against parallel runs.',
     featureAny: 'Any Windows build',
