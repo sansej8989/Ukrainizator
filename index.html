@@ -41,6 +41,9 @@
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
   p.subtitle { margin: 0 0 32px; color: var(--dim); font-size: 16px; max-width: 560px; }
+<a href="https://sansej8989.github.io/support_page/" target="_blank" rel="noopener noreferrer" class="header-support-btn">
+  💛 Підтримати проєкт
+</a>
 
   /* Command box */
   .cmd-box {
@@ -58,6 +61,115 @@
   button.copied { background: var(--gold); }
   .cmd-hint { font-size: 13px; color: var(--dim); margin-bottom: 40px; }
   .cmd-hint b { color: var(--text); }
+   .support-btn {
+     display: inline-flex; align-items: center; justify-content: center;
+     padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 15px;
+     background: var(--blue); color: #0a0e17; text-decoration: none;
+     transition: background 0.2s ease, transform 0.1s ease;
+     min-width: 280px; text-align: center;
+   }
+   .support-btn:hover {
+     background: var(--gold);
+     transform: translateY(-2px);
+   }
+   .support-btn:active {
+     transform: scale(0.98);
+   }
+   /* Header Support Button */
+   .header-support-btn {
+     display: inline-flex; align-items: center; gap: 8px;
+     padding: 8px 14px; border-radius: 999px;
+     font-size: 13px; font-weight: 600; text-decoration: none;
+     background: rgba(255, 209, 70, 0.15); /* light gold bg */
+     color: var(--gold); border: 1px solid rgba(255, 209, 70, 0.4);
+     transition: background 0.2s ease, transform 0.1s ease;
+     margin-bottom: 24px; /* Space below button */
+   }
+   .header-support-btn:hover {
+     background: rgba(255, 209, 70, 0.25);
+     transform: translateY(-1px);
+   }
+   .header-support-btn:active {
+     transform: scale(0.98);
+   }
+
+   /* Redesigned Support Card */
+   .support-card {
+     background: var(--panel);
+     border: 1px solid var(--border);
+     border-radius: 12px;
+     padding: 24px;
+     text-align: center;
+     position: relative;
+     overflow: hidden;
+     margin-top: 24px;
+     box-shadow: 0 4px 18px rgba(0,0,0,0.3);
+   }
+   .support-card::before {
+     content: '';
+     position: absolute;
+     top: -50%; left: -50%;
+     width: 200%; height: 200%;
+     background: conic-gradient(from 0deg, var(--gold) 0%, transparent 20%, transparent 80%, var(--blue) 100%);
+     opacity: 0.1;
+     transform: rotate(0deg);
+     animation: gradientRotate 10s linear infinite;
+   }
+   @keyframes gradientRotate {
+     from { transform: rotate(0deg); }
+     to { transform: rotate(360deg); }
+   }
+   .support-card .inner-content {
+     position: relative;
+     z-index: 1;
+   }
+   .support-card h3 {
+     font-size: 24px;
+     color: var(--gold);
+     margin: 0 0 12px;
+     font-weight: 700;
+     letter-spacing: -0.03em;
+   }
+   .support-card p {
+     font-size: 15px;
+     color: var(--dim);
+     margin: 0 auto 28px;
+     max-width: 500px;
+   }
+   .support-main-btn {
+     display: inline-flex; align-items: center; justify-content: center;
+     padding: 14px 28px; border-radius: 10px; font-weight: 700; font-size: 16px;
+     background: linear-gradient(90deg, var(--blue), var(--gold));
+     color: var(--bg); text-decoration: none;
+     transition: all 0.2s ease;
+     box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+     gap: 10px;
+   }
+   .support-main-btn:hover {
+     opacity: 0.9;
+     transform: translateY(-3px) scale(1.02);
+     box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+   }
+   .support-main-btn:active {
+     transform: scale(0.96);
+   }
+   .support-main-btn .icon {
+     font-size: 20px;
+   }
+   .support-info-badges {
+     display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+     margin-top: 24px;
+     font-size: 12px;
+     color: var(--dim);
+   }
+   .support-info-badges span {
+     background: var(--panel2);
+     border: 1px solid var(--border);
+     border-radius: 999px;
+     padding: 5px 12px;
+   }
+
+
 
   /* Section headers */
   h2 {
@@ -219,28 +331,25 @@
     </div>
   </section>
 
-  <section>
-    <h2>☕ Підтримати проєкт</h2>
-    <div class="alt-card" style="max-width:100%;">
-      <div class="title">На розвиток проєкту — ціль 100 000 ₴</div>
-      <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-        <a href="https://send.monobank.ua/jar/73mvpW18Bk" target="_blank"
-           style="display:inline-flex; align-items:center; padding:9px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#000000; color:#ffffff; text-decoration:none; border:1px solid #2a2a2a;">
-          ⬛ Monobank банка
-        </a>
-        <span style="display:inline-flex; align-items:center; padding:9px 16px; border-radius:8px; font-size:13px; background:var(--panel2); border:1px solid var(--border); color:var(--dim);">
-          Картка: <code style="color:var(--text); margin-left:6px;">4874 1000 2476 2166</code>
-        </span>
-        <a href="https://www.privat24.ua/send/4lpj8" target="_blank"
-           style="display:inline-flex; align-items:center; padding:9px 16px; border-radius:8px; font-weight:600; font-size:13px; background:#5CB82F; color:#ffffff; text-decoration:none;">
-          🟩 Приват24 конверт
-        </a>
-        <span style="display:inline-flex; align-items:center; padding:9px 16px; border-radius:8px; font-size:13px; background:var(--panel2); border:1px solid var(--border); color:var(--dim);">
-          Картка: <code style="color:var(--text); margin-left:6px;">5168 7521 5479 5473</code>
-        </span>
+  <section class="support-card-section">
+  <div class="support-card">
+    <div class="inner-content">
+      <h3>Дякуємо за вашу підтримку! 🇺🇦</h3>
+      <p>
+        Ukrainizator — це безкоштовний open-source проєкт. Ваш внесок допомагає покривати витрати на розробку,
+        серверну інфраструктуру та підтримку інших наших українських ініціатив.
+      </p>
+      <a href="https://sansej8989.github.io/support_page/" target="_blank" rel="noopener noreferrer" class="support-main-btn">
+        <span class="icon">💛</span> Обрати зручний спосіб підтримки →
+      </a>
+      <div class="support-info-badges">
+        <span>✓ Monobank / Банка</span>
+        <span>✓ Картка будь-якого банку</span>
+        <span>✓ Crypto</span>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
   <div class="links">
     <a href="https://github.com/sansej8989/Ukrainizator" target="_blank">Репозиторій</a>
