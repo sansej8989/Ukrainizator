@@ -1,19 +1,22 @@
-﻿# bootstrap.ps1 - downloads a SPECIFIC release of Ukrainizator (not the moving main branch)
-# into a temp folder, verifies the archive checksum,
-# and runs the real ukrainizator.ps1 from disk.
-#
-# Usage:
-#   irm https://sansej8989.github.io/Ukrainizator/bootstrap.ps1 | iex
-#
-# NOTE: this file is deliberately ASCII-only (no Cyrillic). When fetched
-# via irm/Invoke-RestMethod, PowerShell 5.1 decodes the response using the
-# server's declared charset - and GitHub Pages does not always declare
-# charset=utf-8 for .ps1 files, so non-ASCII bytes can get misdecoded and
-# break parsing before the script even runs. ASCII bytes are identical in
-# every common encoding, so this sidesteps the problem entirely. All the
-# actual Ukrainian UI lives in ukrainizator.ps1 itself, which is run as a
-# real local file (with a proper UTF-8 BOM) once downloaded - unaffected.
+<#
+.SYNOPSIS
+    Installs Ukrainizator from the latest GitHub release.
+.DESCRIPTION
+    This script downloads the latest Ukrainizator.zip from GitHub,
+    verifies its checksum, extracts it to a temporary directory,
+    and then launches ukrainizator.ps1. It includes a fallback
+    mechanism to download directly from jsDelivr if GitHub API
+    is unreachable.
 
+    NOTE: this file is deliberately ASCII-only (no Cyrillic). When fetched
+    via irm/Invoke-RestMethod, PowerShell 5.1 decodes the response using the
+    server's declared charset - and GitHub Pages does not always declare
+    charset=utf-8 for .ps1 files, so non-ASCII bytes can get misdecoded and
+    break parsing before the script even runs. ASCII bytes are identical in
+    every common encoding, so this sidesteps the problem entirely. All the
+    actual Ukrainian UI lives in ukrainizator.ps1 itself, which is run as a
+    real local file (with a proper UTF-8 BOM) once downloaded - unaffected.
+#>
 $ErrorActionPreference = 'Stop'
 
 $repoOwner  = 'sansej8989'
