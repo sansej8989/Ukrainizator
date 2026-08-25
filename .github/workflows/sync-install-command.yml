@@ -1,0 +1,55 @@
+name: Sync install command
+
+# Тримає README.md у синхроні з config.json (єдиним джерелом правди для
+# адреси встановлення). Спрацьовує, коли config.json змінюється, і сам
+# комітить оновлення README, якщо команда там застаріла.
+
+"on":
+  push:
+    branches: [main]
+    paths:
+      - 'config.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update README install command block
+        run: |
+          python3 << 'EOF'
+          import json, re
+
+          with open('config.json', encoding='utf-8') as f:
+              cmd = json.load(f)['installCommand']
+
+          with open('README.md', encoding='utf-8') as f:
+              content = f.read()
+
+          block = f"<!-- INSTALL_CMD_START -->\n```powershell\n{cmd}\n```\n<!-- INSTALL_CMD_END -->"
+          new_content = re.sub(
+              r'<!-- INSTALL_CMD_START -->.*?<!-- INSTALL_CMD_END -->',
+              block, content, flags=re.DOTALL
+          )
+
+          with open('README.md', 'w', encoding='utf-8') as f:
+              f.write(new_content)
+          EOF
+
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet README.md; then
+            git add README.md
+            git commit -m "chore: sync install command in README from config.json [skip ci]"
+            git push
+          else
+            echo "README already up to date"
+          fi

@@ -1,0 +1,5 @@
+{
+  "owner": "sansej8989",
+  "repo": "Ukrainizator",
+  "installCommand": "irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1 | iex"
+}
