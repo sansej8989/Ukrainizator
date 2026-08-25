@@ -146,6 +146,51 @@ function Invoke-Optimizations {
     return $optSuccess
 }
 
+function Invoke-LayoutConfiguration {
+    param(
+        [string]$PrimaryLanguageTag = 'uk-UA',
+        [string]$SecondaryLanguageTag = 'en-US',
+        [string]$DefaultLangIMT = '0422:00000422',
+        [string]$SecondaryLangIMT = '0409:00000409'
+    )
+    try {
+        $ll = New-WinUserLanguageList -Language $PrimaryLanguageTag
+        $primaryLang = $ll | Where-Object { $_.LanguageTag -eq $PrimaryLanguageTag }
+        $primaryLang.InputMethodTips.Clear()
+        $primaryLang.InputMethodTips.Add($DefaultLangIMT)
+
+        $ll.Add($SecondaryLanguageTag)
+        $secondaryLang = $ll | Where-Object { $_.LanguageTag -eq $SecondaryLanguageTag }
+        $secondaryLang.InputMethodTips.Clear()
+        $secondaryLang.InputMethodTips.Add($SecondaryLangIMT)
+
+        Set-WinUserLanguageList -LanguageList $ll -Force -ErrorAction Stop -WarningAction SilentlyContinue
+
+        $preloadPath = 'HKCU:\Keyboard Layout\Preload'
+        if (Test-Path $preloadPath) {
+            $preloads = Get-ItemProperty -Path $preloadPath
+            foreach ($prop in $preloads.PSObject.Properties) {
+                if ($prop.Value -eq '00000419') {
+                    Remove-ItemProperty -Path $preloadPath -Name $prop.Name -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+
+        $togglePath = 'HKCU:\Keyboard Layout\Toggle'
+        if (-not (Test-Path $togglePath)) { New-Item -Path $togglePath -Force | Out-Null }
+        Set-ItemProperty -Path $togglePath -Name 'Hotkey' -Value 1 -ErrorAction Stop
+
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Invoke-DeepDerussification {
+    Remove-RussianComponents
+    Clear-TypingSuggestionsCache
+}
+
 function Get-VerificationChecks {
     # Верифікація результату: повертає список перевірок @{ Name; Ok; Detail }.
     # Get-WinUserLanguageList кешує результат на весь час життя процесу -

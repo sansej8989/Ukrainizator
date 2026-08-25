@@ -48,7 +48,7 @@ $global:DebugMode = $false # Set to $true to enable debug messages
 # живе в окремих .psm1 модулях у папці modules/. Імпортуємо з -Global,
 # щоб функції модулів бачили одна одну та глобальний стан скрипта.
 $modulesRoot = Join-Path $PSScriptRoot 'modules'
-foreach ($moduleName in @('Localization', 'Sound', 'UI', 'BackupRestore', 'SystemSetup')) {
+foreach ($moduleName in @('Localization', 'Sound', 'UI', 'BackupRestore', 'SystemSetup', 'Menu', 'Preflight', 'AppsLocalization')) {
     Import-Module (Join-Path $modulesRoot "$moduleName.psm1") -Force -Global -ErrorAction Stop
 }
 $scriptLocalePath = Join-Path $PSScriptRoot 'locales'
@@ -189,6 +189,18 @@ $global:steps = @()
 $global:FailedSteps = New-Object System.Collections.ArrayList   # для "продовжити після помилки" - підсумок наприкінці
 $global:BackupData = [ordered]@{}                                # знімок налаштувань "до" - для -Revert
 
+function Test-ShouldRun {
+    param([string]$Phase)
+    $profile = $global:ActiveProfile
+    if (-not $profile -or $profile -eq 'Full') { return $true }
+    switch ($Phase) {
+        'Language'        { return $profile -in @('Full', 'Language') }
+        'Layouts'         { return $profile -in @('Full', 'Layouts') }
+        'Derussification' { return $profile -in @('Full', 'Derussification') }
+        default           { return $true }
+    }
+}
+
 function Add-StepIssue {
     param([int]$id, [string]$name, [string]$message)
     [void]$global:FailedSteps.Add([pscustomobject]@{ Id = $id; Name = $name; Message = $message })
@@ -208,6 +220,29 @@ Invoke-Sound -Type 'Startup'
 try {
     Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { try { [Console]::CursorVisible = $true } catch {} } -ErrorAction SilentlyContinue | Out-Null
 } catch {}
+
+#region === Інтерактивне меню ===
+if ($PSBoundParameters.Count -eq 0) {
+    $global:ActiveProfile = Show-InteractiveMenu
+} else {
+    $global:ActiveProfile = 'Full'
+}
+
+if ($global:ActiveProfile -eq 'Revert') {
+    Invoke-RevertMode -WhatIf:$WhatIf
+}
+if ($global:ActiveProfile -eq 'Exit') {
+    Restore-Console
+    exit 0
+}
+if ($global:ActiveProfile -eq 'Apps') {
+    Write-Log (Get-LocalizedMessage 'apps_title') -Color Cyan
+    Set-AppsUkrainianLocale
+    Write-Log (Get-LocalizedMessage 'apps_done') -Color DarkGreen
+    Restore-Console
+    exit 0
+}
+#endregion
 
 #region === Відкат (-Revert) ===
 if ($Revert) {
@@ -314,6 +349,12 @@ try {
     $global:WinDisplayVersion = 'невідомо'
     $global:WinProductName = 'невідома збірка Windows'
     Write-Log (Get-LocalizedMessage 'os_detect_failed') -Color DarkYellow
+}
+#endregion
+
+#region === Pre-flight Checks ===
+if (-not $Silent -and -not $WhatIf) {
+    Test-SystemReadiness | Out-Null
 }
 #endregion
 
@@ -432,6 +473,7 @@ if ($global:UseModernLanguageApi) {
 }
 #endregion
 
+if (Test-ShouldRun 'Language') {
 #region === 7. Language Pack ===
 Set-StepStatus -id 7 -status 'running'
 Show-ProgressBar -Percent 60 -Label (Get-LocalizedMessage 'language_pack_installation')
@@ -488,7 +530,10 @@ if ($targetLanguageInstalled) {
     }
 }
 #endregion
+}
+#endregion
 
+if (Test-ShouldRun 'Language') {
 #region === 8. Interface ===
 Set-StepStatus -id 8 -status 'running'
 Show-ProgressBar -Percent 70 -Label (Get-LocalizedMessage 'interface_label')
@@ -519,7 +564,10 @@ try {
 }
 }
 #endregion
+}
+#endregion
 
+if (Test-ShouldRun 'Language') {
 #region === 9. Regional Formats ===
 Set-StepStatus -id 9 -status 'running'
 Show-ProgressBar -Percent 80 -Label (Get-LocalizedMessage 'regional_formats_label')
@@ -559,69 +607,33 @@ try {
 }
 }
 #endregion
+}
+#endregion
 
 #region === 10. Derussification & Layouts ===
 Set-StepStatus -id 10 -status 'running'
 Show-ProgressBar -Percent 90 -Label (Get-LocalizedMessage 'layouts_label')
 if ($WhatIf) {
     Set-StepStatus -id 10 -status 'skipped' -result '[WhatIf]'
-    Write-Log '[WhatIf] Було б видалено ru-* мову/розкладку/пакети розпізнавання мовлення та рукопису' -Color DarkYellow
+    Write-Log '[WhatIf] Було б налаштовано розкладки та видалено ru-компоненти' -Color DarkYellow
 } else {
-try {
-    $list = Get-WinUserLanguageList
-    $ruLanguages = $list | Where-Object { $_.LanguageTag -match 'ru' }
-    foreach ($ruLang in $ruLanguages) {
-        $list.Remove($ruLang)
-        Write-Log (Get-LocalizedMessage 'removed_russian_language' $ruLang.LanguageTag) -Color DarkYellow
-    }
+    $runLayouts = Test-ShouldRun 'Layouts'
+    $runDeruss = Test-ShouldRun 'Derussification'
 
-    $ll = New-WinUserLanguageList -Language 'uk-UA'
-    $defaultLangIMT = '0422:00000422'
-    $primaryLang = $ll | Where-Object { $_.LanguageTag -eq 'uk-UA' }
-    $primaryLang.InputMethodTips.Clear()
-    $primaryLang.InputMethodTips.Add($defaultLangIMT)
-
-    $secondaryLanguageTag = 'en-US'
-    $secondaryLangIMT = '0409:00000409'
-    $ll.Add($secondaryLanguageTag)
-    $secondaryLang = $ll | Where-Object { $_.LanguageTag -eq $secondaryLanguageTag }
-    $secondaryLang.InputMethodTips.Clear()
-    $secondaryLang.InputMethodTips.Add($secondaryLangIMT)
-
-    Set-WinUserLanguageList -LanguageList $ll -Force -ErrorAction Stop -WarningAction SilentlyContinue
-
-    $preloadPath = 'HKCU:\Keyboard Layout\Preload'
-    if (Test-Path $preloadPath) {
-        $preloads = Get-ItemProperty -Path $preloadPath
-        foreach ($prop in $preloads.PSObject.Properties) {
-            if ($prop.Value -eq '00000419') {
-                Remove-ItemProperty -Path $preloadPath -Name $prop.Name -Force -ErrorAction SilentlyContinue
-                Write-Log (Get-LocalizedMessage 'removed_russian_layout') -Color DarkYellow
-            }
+    if ($runLayouts) {
+        $layoutOk = Invoke-LayoutConfiguration
+        if (-not $layoutOk) {
+            Add-StepIssue -id 10 -name (Get-LocalizedMessage 'derussification_layouts') -message (Get-LocalizedMessage 'layout_cleanup_error')
         }
     }
+    if ($runDeruss) {
+        Invoke-DeepDerussification
+    }
 
-    $togglePath = 'HKCU:\Keyboard Layout\Toggle'
-    if (-not (Test-Path $togglePath)) { New-Item -Path $togglePath -Force | Out-Null }
-    Set-ItemProperty -Path $togglePath -Name 'Hotkey' -Value 1 -ErrorAction Stop
-
-    # --- Глибша дерусифікація ---
-    # 1) Додаткові ru-* компоненти Windows (розпізнавання мовлення, рукописне
-    #    введення, синтез мовлення) - вони НЕ прибираються самим лише видаленням
-    #    мови зі списку розкладок, а встановлюються/видаляються окремо.
-    Remove-RussianComponents
-
-    # 2) Кеш підказок під час набору тексту (може містити напрацьовані ru-слова).
-    #    Офіційно документований шлях Microsoft для скидання персоналізації вводу.
-    Clear-TypingSuggestionsCache
-
-    Set-StepStatus -id 10 -status 'success' -result (Get-LocalizedMessage 'layouts_set_result' @('uk-UA', $secondaryLanguageTag))
-    Write-Log (Get-LocalizedMessage 'layout_cleanup_completed' @('uk-UA', $secondaryLanguageTag)) -Color DarkGreen
-} catch {
-    Set-StepStatus -id 10 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
-    Add-StepIssue -id 10 -name (Get-LocalizedMessage 'derussification_layouts') -message (Get-FriendlyErrorMessage $_.Exception.Message)
-    Write-Log (Get-LocalizedMessage 'layout_cleanup_error' (Get-FriendlyErrorMessage $_.Exception.Message)) -Color DarkYellow
-}
+    if ($runLayouts -or $runDeruss) {
+        Set-StepStatus -id 10 -status 'success' -result (Get-LocalizedMessage 'layouts_set_result' @('uk-UA', 'en-US'))
+        Write-Log (Get-LocalizedMessage 'layout_cleanup_completed' @('uk-UA', 'en-US')) -Color DarkGreen
+    }
 }
 #endregion
 
@@ -668,10 +680,10 @@ if ($WhatIf) {
             Set-StepStatus -id 12 -status 'skipped' -result "$passCount/$totalCount OK"
             Add-StepIssue -id 12 -name (Get-LocalizedMessage 'verification_step') -message (Get-LocalizedMessage 'checks_not_all_passed' $passCount $totalCount)
         }
-    } catch {
-        Set-StepStatus -id 12 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
-        Write-Log (Get-LocalizedMessage 'verify_failed_log' (Get-FriendlyErrorMessage $_.Exception.Message)) -Color DarkYellow
-    }
+} catch {
+    Set-StepStatus -id 12 -status 'skipped' -result (Get-LocalizedMessage 'status_error')
+    Write-Log (Get-LocalizedMessage 'verify_failed_log' (Get-FriendlyErrorMessage $_.Exception.Message)) -Color DarkYellow
+}
 }#endregion
 
 # === Completion ===

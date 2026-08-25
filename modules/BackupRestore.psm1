@@ -39,7 +39,8 @@ function Move-LegacySnapshots {
 
 function Invoke-RevertMode {
     # Повний цикл відкату: знаходить останній знімок, питає підтвердження,
-    # відновлює SystemLocale / UILanguage / Culture / GeoId / LanguageList.
+    # відновлює SystemLocale / UILanguage / Culture / GeoId / LanguageList,
+    # виводить підсумковий звіт.
     param([switch]$WhatIf)
 
     Write-Log (Get-LocalizedMessage 'revert_mode_started') -Color DarkYellow
@@ -87,12 +88,22 @@ function Invoke-RevertMode {
                     Set-WinUserLanguageList -LanguageList $ll -Force -ErrorAction SilentlyContinue
                 } catch {}
             }
+
+            # Підсумковий звіт
+            Clear-InfoPanel
+            Write-Host ''
+            Write-Host ('  {0}' -f (Get-LocalizedMessage 'revert_report_title')) -ForegroundColor Cyan
+            Write-Host ("  {0}: {1}" -f (Get-LocalizedMessage 'revert_report_locale'), ($bk.SystemLocale -as [string])) -ForegroundColor Gray
+            Write-Host ("  {0}: {1}" -f (Get-LocalizedMessage 'revert_report_culture'), ($bk.Culture -as [string])) -ForegroundColor Gray
+            Write-Host ("  {0}: {1}" -f (Get-LocalizedMessage 'revert_report_geo'), ($bk.GeoId -as [string])) -ForegroundColor Gray
+            $langListStr = if ($bk.LanguageList) { ($bk.LanguageList -join ', ') } else { '-' }
+            Write-Host ("  {0}: {1}" -f (Get-LocalizedMessage 'revert_report_langs'), $langListStr) -ForegroundColor Gray
+            Write-Host ''
+            Write-Host ('  {0}' -f (Get-LocalizedMessage 'revert_report_success')) -ForegroundColor Green
             Write-Log (Get-LocalizedMessage 'settings_restored') -Color DarkGreen
         } else {
             Write-Log (Get-LocalizedMessage 'revert_whatif') -Color DarkYellow
         }
-        Clear-InfoPanel
-        Show-CompletionBanner
         Restore-Console
         Write-Host ''
         Write-Host "  $(Get-LocalizedMessage 'dont_forget_reboot')" -ForegroundColor DarkYellow
