@@ -18,6 +18,14 @@
     --text: #e8ecf4;
     --dim: #8b96a5;
   }
+  :root[data-theme="light"] {
+    --bg: #f4f6f9;
+    --panel: #ffffff;
+    --panel2: #eef1f6;
+    --border: #d1d5db;
+    --text: #111827;
+    --dim: #6b7280;
+  }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -221,7 +229,43 @@
 
   a { color: var(--blue); text-decoration: none; }
   a:hover { text-decoration: underline; }
-  .links { display: flex; gap: 20px; font-size: 13.5px; flex-wrap: wrap; }
+   .links { display: flex; gap: 20px; font-size: 13.5px; flex-wrap: wrap; }
+
+   .controls {
+     display: flex;
+     align-items: center;
+     gap: 10px;
+   }
+   .toggle-group {
+     display: inline-flex;
+     background: var(--panel);
+     border: 1px solid var(--border);
+     border-radius: 999px;
+     padding: 3px;
+     gap: 2px;
+   }
+   .toggle-group button {
+     background: transparent;
+     color: var(--dim);
+     border: none;
+     border-radius: 999px;
+     padding: 4px 10px;
+     font-size: 11px;
+     font-weight: 600;
+     cursor: pointer;
+     transition: background 0.15s ease, color 0.15s ease;
+   }
+   .toggle-group button:hover {
+     color: var(--text);
+     background: rgba(255,255,255,0.05);
+   }
+   :root[data-theme="light"] .toggle-group button:hover {
+     background: rgba(0,0,0,0.05);
+   }
+   .toggle-group button.active {
+     background: var(--blue);
+     color: #0a0e17;
+   }
 
   footer {
     margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--border);
@@ -244,63 +288,75 @@
       <span class="badge">PowerShell 5.1+</span>
       <span class="badge">MIT</span>
     </div>
+    <div class="controls">
+      <div class="toggle-group" id="langToggle" aria-label="Language">
+        <button data-lang="uk" title="Українська">UA</button>
+        <button data-lang="en" title="English">EN</button>
+        <button data-lang="auto" title="Auto">Auto</button>
+      </div>
+      <div class="toggle-group" id="themeToggle" aria-label="Theme">
+        <button data-theme-val="dark" title="Dark">🌙</button>
+        <button data-theme-val="light" title="Light">☀️</button>
+        <button data-theme-val="auto" title="Auto">Auto</button>
+      </div>
+    </div>
     <a href="https://sansej8989.github.io/support_page/" target="_blank" rel="noopener noreferrer" class="header-support-btn">💛 Підтримати проєкт</a>
   </div>
 
-  <h1>Українізатор</h1>
-  <p class="subtitle">
+  <h1 data-i18n="title">Українізатор</h1>
+  <p class="subtitle" data-i18n="subtitle">
     Автоматична українізація Windows в один прохід: мовний пакет, інтерфейс,
     регіональні стандарти, розкладки й дерусифікація — 12 кроків, один запуск.
   </p>
 
   <div class="cmd-box">
     <code id="cmd">завантаження...</code>
-    <button id="copyBtn" onclick="copyCmd()">Копіювати</button>
+    <button id="copyBtn" onclick="copyCmd()" data-i18n="copyBtn">Копіювати</button>
   </div>
-  <p class="cmd-hint">
+  <p class="cmd-hint" data-i18n="cmdHint">
     Запускати в PowerShell <b>від імені адміністратора</b>. Завантажує останній
     перевірений реліз (не гілку в розробці), звіряє контрольну суму архіву й лише
     тоді запускає скрипт із диска.
   </p>
 
   <section>
-    <h2>Що робить</h2>
+    <h2 data-i18n="whatItDoes">Що робить</h2>
     <div class="grid">
       <div class="feature">
         <div class="icon">🇺🇦</div>
-        <div class="title">Повна українізація</div>
-        <div class="desc">Мовний пакет, інтерфейс, регіон, часовий пояс, валюта ₴, розкладки — за один прогін.</div>
+        <div class="title" data-i18n="featureFull">Повна українізація</div>
+        <div class="desc" data-i18n="featureFullDesc">Мовний пакет, інтерфейс, регіон, часовий пояс, валюта ₴, розкладки — за один прогін.</div>
       </div>
       <div class="feature">
         <div class="icon">🧹</div>
-        <div class="title">Глибока дерусифікація</div>
-        <div class="desc">Прибирає ru-розкладку та додаткові ru-компоненти: мовлення, рукопис, OCR.</div>
+        <div class="title" data-i18n="featureDerus">Глибока дерусифікація</div>
+        <div class="desc" data-i18n="featureDerusDesc">Прибирає ru-розкладку та додаткові ru-компоненти: мовлення, рукопис, OCR.</div>
       </div>
       <div class="feature">
         <div class="icon">↩️</div>
-        <div class="title">Відкат в один клік</div>
-        <div class="desc">Знімок налаштувань перед стартом і <code>-Revert</code> для миттєвого повернення.</div>
+        <div class="title" data-i18n="featureRevert">Відкат в один клік</div>
+        <div class="desc" data-i18n="featureRevertDesc">Знімок налаштувань перед стартом і <code>-Revert</code> для миттєвого повернення.</div>
       </div>
       <div class="feature">
         <div class="icon">🛡️</div>
-        <div class="title">Безпечно за задумом</div>
-        <div class="desc">Точка відновлення, перевірка цілісності скрипта (SHA-256), захист від паралельного запуску.</div>
+        <div class="title" data-i18n="featureSafe">Безпечно за задумом</div>
+        <div class="desc" data-i18n="featureSafeDesc">Точка відновлення, перевірка цілісності скрипта (SHA-256), захист від паралельного запуску.</div>
       </div>
       <div class="feature">
         <div class="icon">🖥️</div>
-        <div class="title">Будь-яка збірка Windows</div>
-        <div class="desc">Автоматичний вибір способу встановлення мови: сучасний API або запасний DISM-шлях.</div>
+        <div class="title" data-i18n="featureAny">Будь-яка збірка Windows</div>
+        <div class="desc" data-i18n="featureAnyDesc">Автоматичний вибір способу встановлення мови: сучасний API або запасний DISM-шлях.</div>
       </div>
       <div class="feature">
         <div class="icon">⚙️</div>
-        <div class="title">Тихий режим для флоту</div>
-        <div class="desc"><code>-Silent -Mode All</code>, <code>-WhatIf</code> для перегляду, віддалений запуск на список ПК.</div>
+        <div class="title" data-i18n="featureSilent">Тихий режим для флоту</div>
+        <div class="desc" data-i18n="featureSilentDesc"><code>-Silent -Mode All</code>, <code>-WhatIf</code> для перегляду, віддалений запуск на список ПК.</div>
       </div>
     </div>
   </section>
 
   <section>
-    <h2>Як це виглядає</h2>
+    <h2 data-i18n="howItLooks">Як це виглядає</h2>
     <div class="terminal">
       <div class="step"><span class="ok">✓</span><span class="num">1.</span><span class="name">Перевірка прав адміністратора</span><span class="result">OK</span></div>
       <div class="step"><span class="ok">✓</span><span class="num">4.</span><span class="name">Точка відновлення</span><span class="result">Створено</span></div>
@@ -311,27 +367,27 @@
   </section>
 
   <section>
-    <h2>Вимоги</h2>
+    <h2 data-i18n="requirements">Вимоги</h2>
     <ul class="reqs">
-      <li><b>ОС</b> Windows 10 або Windows 11, будь-яка редакція крім Home (обмеження самої Microsoft на Language Packs)</li>
-      <li><b>PowerShell</b> версія 5.1 або новіша (вбудована в сучасні Windows)</li>
-      <li><b>Права</b> адміністратор</li>
-      <li><b>Інтернет</b> потрібен для завантаження мовного пакету й самого релізу</li>
+      <li><b data-i18n="reqOs">ОС</b> <span data-i18n="reqOsVal">Windows 10 або Windows 11, будь-яка редакція крім Home (обмеження самої Microsoft на Language Packs)</span></li>
+      <li><b data-i18n="reqPs">PowerShell</b> <span data-i18n="reqPsVal">версія 5.1 або новіша (вбудована в сучасні Windows)</span></li>
+      <li><b data-i18n="reqRights">Права</b> <span data-i18n="reqRightsVal">адміністратор</span></li>
+      <li><b data-i18n="reqNet">Інтернет</b> <span data-i18n="reqNetVal">потрібен для завантаження мовного пакету й самого релізу</span></li>
     </ul>
   </section>
 
   <section>
-    <h2>Інші способи встановлення</h2>
+    <h2 data-i18n="otherWays">Інші способи встановлення</h2>
     <div class="alt-grid">
       <div class="alt-card">
-        <div class="title">📦 Вручну</div>
-        Завантажте останній реліз і запустіть <code>Start_MANUAL.bat</code> (з питаннями) або <code>Start_AUTO.bat</code> (тихий режим).
-        <br><a href="https://github.com/sansej8989/Ukrainizator/releases/latest" target="_blank">Завантажити реліз →</a>
+        <div class="title" data-i18n="altManual">📦 Вручну</div>
+        <span data-i18n="altManualDesc">Завантажте останній реліз і запустіть </span><code>Start_MANUAL.bat</code> <span data-i18n="altManualDesc2">(з питаннями) або </span><code>Start_AUTO.bat</code> <span data-i18n="altManualDesc3">(тихий режим).</span>
+        <br><a href="https://github.com/sansej8989/Ukrainizator/releases/latest" target="_blank" data-i18n="altManualLink">Завантажити реліз →</a>
       </div>
       <div class="alt-card">
-        <div class="title">🖧 На кілька машин</div>
-        <code>.\ukrainizator.ps1 -ComputerName PC1,PC2 -Credential (Get-Credential)</code> — розгортання через PS Remoting.
-        <br><a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank">Детальніше в README →</a>
+        <div class="title" data-i18n="altRemote">🖧 На кілька машин</div>
+        <span data-i18n="altRemoteDesc"><code>.\ukrainizator.ps1 -ComputerName PC1,PC2 -Credential (Get-Credential)</code> — розгортання через PS Remoting.</span>
+        <br><a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank" data-i18n="altRemoteLink">Детальніше в README →</a>
       </div>
     </div>
   </section>
@@ -339,62 +395,237 @@
   <section class="support-card-section">
   <div class="support-card">
     <div class="inner-content">
-      <h3>Дякуємо за вашу підтримку! 🇺🇦</h3>
-      <p>
+      <h3 data-i18n="supportTitle">Дякуємо за вашу підтримку! 🇺🇦</h3>
+      <p data-i18n="supportText">
         Ukrainizator — це безкоштовний open-source проєкт. Ваш внесок допомагає покривати витрати на розробку,
         серверну інфраструктуру та підтримку інших наших українських ініціатив.
       </p>
       <a href="https://sansej8989.github.io/support_page/" target="_blank" rel="noopener noreferrer" class="support-main-btn">
-        <span class="icon">💛</span> Обрати зручний спосіб підтримки →
+        <span class="icon">💛</span> <span data-i18n="supportBtn">Обрати зручний спосіб підтримки</span> →
       </a>
       <div class="support-info-badges">
-        <span>✓ Monobank / Банка</span>
-        <span>✓ Картка будь-якого банку</span>
-        <span>✓ Crypto</span>
+        <span data-i18n="supportBadge1">✓ Monobank / Банка</span>
+        <span data-i18n="supportBadge2">✓ Картка будь-якого банку</span>
+        <span data-i18n="supportBadge3">✓ Crypto</span>
       </div>
     </div>
   </div>
 </section>
 
   <div class="links">
-    <a href="https://github.com/sansej8989/Ukrainizator" target="_blank">Репозиторій</a>
-    <a href="https://github.com/sansej8989/Ukrainizator/releases" target="_blank">Усі релізи</a>
-    <a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank">Документація</a>
-    <a href="https://github.com/sansej8989/Ukrainizator/issues" target="_blank">Повідомити про проблему</a>
+    <a href="https://github.com/sansej8989/Ukrainizator" target="_blank" data-i18n="linkRepo">Репозиторій</a>
+    <a href="https://github.com/sansej8989/Ukrainizator/releases" target="_blank" data-i18n="linkReleases">Усі релізи</a>
+    <a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank" data-i18n="linkDocs">Документація</a>
+    <a href="https://github.com/sansej8989/Ukrainizator/issues" target="_blank" data-i18n="linkIssues">Повідомити про проблему</a>
   </div>
 
   <footer>
-    <span>Українізатор — персональний проєкт, з відкритим кодом.</span>
+    <span data-i18n="footerText">Українізатор — персональний проєкт, з відкритим кодом.</span>
     <span id="year"></span>
   </footer>
 
 </div>
 
 <script>
-// Єдине джерело правди - config.json у корені репозиторію. Якщо адреса
-// колись зміниться (перейменування репо, інший формат бутстрапа тощо) -
-// правиться лише там, а ця сторінка й README підхоплюють автоматично.
-fetch('./config.json')
-  .then(r => r.json())
-  .then(cfg => {
-    document.getElementById('cmd').textContent = cfg.installCommand;
-  })
-  .catch(() => {
-    document.getElementById('cmd').textContent =
-      'irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1 | iex';
-  });
+const translations = {
+  uk: {
+    title: 'Українізатор',
+    subtitle: 'Автоматична українізація Windows в один прохід: мовний пакет, інтерфейс, регіональні стандарти, розкладки й дерусифікація — 12 кроків, один запуск.',
+    cmdHint: 'Запускати в PowerShell <b>від імені адміністратора</b>. Завантажує останній перевірений реліз (не гілку в розробці), звіряє контрольну суму архіву й лише тоді запускає скрипт із диска.',
+    whatItDoes: 'Що робить',
+    featureFull: 'Повна українізація',
+    featureFullDesc: 'Мовний пакет, інтерфейс, регіон, часовий пояс, валюта ₴, розкладки — за один прогін.',
+    featureDerus: 'Глибока дерусифікація',
+    featureDerusDesc: 'Прибирає ru-розкладку та додаткові ru-компоненти: мовлення, рукопис, OCR.',
+    featureRevert: 'Відкат в один клік',
+    featureRevertDesc: 'Знімок налаштувань перед стартом і <code>-Revert</code> для миттєвого повернення.',
+    featureSafe: 'Безпечно за задумом',
+    featureSafeDesc: 'Точка відновлення, перевірка цілісності скрипта (SHA-256), захист від паралельного запуску.',
+    featureAny: 'Будь-яка збірка Windows',
+    featureAnyDesc: 'Автоматичний вибір способу встановлення мови: сучасний API або запасний DISM-шлях.',
+    featureSilent: 'Тихий режим для флоту',
+    featureSilentDesc: '<code>-Silent -Mode All</code>, <code>-WhatIf</code> для перегляду, віддалений запуск на список ПК.',
+    howItLooks: 'Як це виглядає',
+    requirements: 'Вимоги',
+    reqOs: 'ОС',
+    reqOsVal: 'Windows 10 або Windows 11, будь-яка редакція крім Home (обмеження самої Microsoft на Language Packs)',
+    reqPs: 'PowerShell',
+    reqPsVal: 'версія 5.1 або новіша (вбудована в сучасні Windows)',
+    reqRights: 'Права',
+    reqRightsVal: 'адміністратор',
+    reqNet: 'Інтернет',
+    reqNetVal: 'потрібен для завантаження мовного пакету й самого релізу',
+    otherWays: 'Інші способи встановлення',
+    altManual: '📦 Вручну',
+    altManualDesc: 'Завантажте останній реліз і запустіть ',
+    altManualDesc2: '(з питаннями) або ',
+    altManualDesc3: '(тихий режим).',
+    altManualLink: 'Завантажити реліз →',
+    altRemote: '🖧 На кілька машин',
+    altRemoteDesc: '<code>.\\ukrainizator.ps1 -ComputerName PC1,PC2 -Credential (Get-Credential)</code> — розгортання через PS Remoting.',
+    altRemoteLink: 'Детальніше в README →',
+    supportTitle: 'Дякуємо за вашу підтримку! 🇺🇦',
+    supportText: 'Ukrainizator — це безкоштовний open-source проєкт. Ваш внесок допомагає покривати витрати на розробку, серверну інфраструктуру та підтримку інших наших українських ініціатив.',
+    supportBtn: 'Обрати зручний спосіб підтримки',
+    supportBadge1: '✓ Monobank / Банка',
+    supportBadge2: '✓ Картка будь-якого банку',
+    supportBadge3: '✓ Crypto',
+    linkRepo: 'Репозиторій',
+    linkReleases: 'Усі релізи',
+    linkDocs: 'Документація',
+    linkIssues: 'Повідомити про проблему',
+    footerText: 'Українізатор — персональний проєкт, з відкритим кодом.',
+    copyBtn: 'Копіювати',
+    copied: 'Скопійовано!'
+  },
+  en: {
+    title: 'Ukrainizator',
+    subtitle: 'Automated Windows Ukrainization in one go: language pack, interface, regional standards, layouts, and derussification — 12 steps, one run.',
+    cmdHint: 'Run in PowerShell <b>as Administrator</b>. Downloads the latest stable release (not the dev branch), verifies the archive checksum, and only then runs the script from disk.',
+    whatItDoes: 'What it does',
+    featureFull: 'Full Ukrainization',
+    featureFullDesc: 'Language pack, interface, region, timezone, currency ₴, layouts — in one pass.',
+    featureDerus: 'Deep derussification',
+    featureDerusDesc: 'Removes ru-layout and extra ru-components: speech, handwriting, OCR.',
+    featureRevert: 'One-click revert',
+    featureRevertDesc: 'Snapshot of settings before start and <code>-Revert</code> for instant rollback.',
+    featureSafe: 'Safe by design',
+    featureSafeDesc: 'Restore point, script integrity check (SHA-256), protection against parallel runs.',
+    featureAny: 'Any Windows build',
+    featureAnyDesc: 'Automatic selection of language installation method: modern API or fallback DISM path.',
+    featureSilent: 'Silent mode for fleets',
+    featureSilentDesc: '<code>-Silent -Mode All</code>, <code>-WhatIf</code> for preview, remote run on a list of PCs.',
+    howItLooks: 'How it looks',
+    requirements: 'Requirements',
+    reqOs: 'OS',
+    reqOsVal: 'Windows 10 or Windows 11, any edition except Home (Microsoft limitation on Language Packs)',
+    reqPs: 'PowerShell',
+    reqPsVal: 'version 5.1 or newer (built into modern Windows)',
+    reqRights: 'Rights',
+    reqRightsVal: 'Administrator',
+    reqNet: 'Internet',
+    reqNetVal: 'needed to download the language pack and the release itself',
+    otherWays: 'Other installation methods',
+    altManual: '📦 Manually',
+    altManualDesc: 'Download the latest release and run ',
+    altManualDesc2: '(with prompts) or ',
+    altManualDesc3: '(silent mode).',
+    altManualLink: 'Download release →',
+    altRemote: '🖧 For multiple machines',
+    altRemoteDesc: '<code>.\\ukrainizator.ps1 -ComputerName PC1,PC2 -Credential (Get-Credential)</code> — deployment via PS Remoting.',
+    altRemoteLink: 'More in README →',
+    supportTitle: 'Thank you for your support! 🇺🇦',
+    supportText: 'Ukrainizator is a free open-source project. Your contribution helps cover development costs, server infrastructure, and support for our other Ukrainian initiatives.',
+    supportBtn: 'Choose a convenient way to support',
+    supportBadge1: '✓ Monobank / Bank',
+    supportBadge2: '✓ Card of any bank',
+    supportBadge3: '✓ Crypto',
+    linkRepo: 'Repository',
+    linkReleases: 'All releases',
+    linkDocs: 'Documentation',
+    linkIssues: 'Report an issue',
+    footerText: 'Ukrainizator — personal project, open source.',
+    copyBtn: 'Copy',
+    copied: 'Copied!'
+  }
+};
 
-function copyCmd() {
-  const text = document.getElementById('cmd').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.getElementById('copyBtn');
-    const original = btn.textContent;
-    btn.textContent = 'Скопійовано!';
-    btn.classList.add('copied');
-    setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+function getLang() {
+  const saved = localStorage.getItem('lang');
+  if (saved && ['uk', 'en', 'auto'].includes(saved)) return saved;
+  return 'auto';
+}
+
+function getTheme() {
+  const saved = localStorage.getItem('theme');
+  if (saved && ['dark', 'light', 'auto'].includes(saved)) return saved;
+  return 'auto';
+}
+
+function applyLang(lang) {
+  if (lang === 'auto') {
+    const browser = navigator.language || navigator.userLanguage || 'uk';
+    lang = browser.startsWith('uk') ? 'uk' : 'en';
+  }
+  document.documentElement.lang = lang;
+  const t = translations[lang] || translations.uk;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) {
+      el.innerHTML = t[key];
+    }
+  });
+  document.querySelectorAll('#copyBtn').forEach(btn => {
+    const key = btn.getAttribute('data-i18n');
+    if (key && t[key]) btn.textContent = t[key];
+  });
+  document.querySelectorAll('#langToggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-lang') === (localStorage.getItem('lang') || 'auto'));
   });
 }
-document.getElementById('year').textContent = '© ' + new Date().getFullYear();
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  if (theme === 'auto') {
+    root.removeAttribute('data-theme');
+  } else {
+    root.setAttribute('data-theme', theme);
+  }
+  document.querySelectorAll('#themeToggle button').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-theme-val') === (localStorage.getItem('theme') || 'auto'));
+  });
+}
+
+function init() {
+  const lang = getLang();
+  const theme = getTheme();
+  localStorage.setItem('lang', lang);
+  localStorage.setItem('theme', theme);
+  applyLang(lang);
+  applyTheme(theme);
+
+  document.querySelectorAll('#langToggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.getAttribute('data-lang');
+      localStorage.setItem('lang', val);
+      applyLang(val);
+    });
+  });
+
+  document.querySelectorAll('#themeToggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = btn.getAttribute('data-theme-val');
+      localStorage.setItem('theme', val);
+      applyTheme(val);
+    });
+  });
+
+  fetch('./config.json')
+    .then(r => r.json())
+    .then(cfg => {
+      document.getElementById('cmd').textContent = cfg.installCommand;
+    })
+    .catch(() => {
+      document.getElementById('cmd').textContent =
+        'irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1 | iex';
+    });
+
+  function copyCmd() {
+    const text = document.getElementById('cmd').textContent;
+    const lang = getLang();
+    const t = translations[lang === 'auto' ? (navigator.language.startsWith('uk') ? 'uk' : 'en') : lang] || translations.uk;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      const original = btn.textContent;
+      btn.textContent = t.copied;
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+    });
+  }
+  document.getElementById('year').textContent = '© ' + new Date().getFullYear();
+}
+
+init();
 </script>
 </body>
 </html>
