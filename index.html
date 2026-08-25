@@ -29,7 +29,11 @@
   .wrap { max-width: 880px; margin: 0 auto; padding: 56px 24px 80px; }
 
   /* Hero */
-  .badges { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+  .hero-header {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 18px;
+  }
   .badge {
     font-size: 12px; padding: 4px 10px; border-radius: 999px;
     border: 1px solid var(--border); color: var(--dim); background: var(--panel);
@@ -233,14 +237,15 @@
 <body>
 <div class="wrap">
 
-  <div class="badges">
-    <span class="badge ok">v5.0.4</span>
-    <span class="badge">Windows 10 / 11</span>
-    <span class="badge">PowerShell 5.1+</span>
-    <span class="badge">MIT</span>
+  <div class="hero-header">
+    <div class="badges">
+      <span class="badge ok">v5.0.4</span>
+      <span class="badge">Windows 10 / 11</span>
+      <span class="badge">PowerShell 5.1+</span>
+      <span class="badge">MIT</span>
+    </div>
+    <a href="https://sansej8989.github.io/support_page/" target="_blank" rel="noopener noreferrer" class="header-support-btn">💛 Підтримати проєкт</a>
   </div>
-
-  <a href="https://sansej8989.github.io/support_page/" target="_blank" rel="noopener noreferrer" class="header-support-btn">💛 Підтримати проєкт</a>
 
   <h1>Українізатор</h1>
   <p class="subtitle">
