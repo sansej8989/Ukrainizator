@@ -1,5 +1,5 @@
-﻿# bootstrap.ps1 - downloads a SPECIFIC release of Ukrainizator not the
-# moving main branch) into a temp folder, verifies the archive checksum,
+﻿# bootstrap.ps1 - downloads a SPECIFIC release of Ukrainizator (not the moving main branch)
+# into a temp folder, verifies the archive checksum,
 # and runs the real ukrainizator.ps1 from disk.
 #
 # Usage:
