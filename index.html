@@ -272,10 +272,201 @@
     font-size: 12.5px; color: var(--dim); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px;
   }
 
-  @media (max-width: 560px) {
-    h1 { font-size: 30px; }
-    .alt-grid { grid-template-columns: 1fr; }
-  }
+   @media (max-width: 560px) {
+     h1 { font-size: 30px; }
+     .alt-grid { grid-template-columns: 1fr; }
+   }
+
+   /* Command Builder */
+   .builder {
+     background: var(--panel);
+     border: 1px solid var(--border);
+     border-radius: 12px;
+     padding: 18px;
+     margin-bottom: 40px;
+   }
+   .builder h2 {
+     margin: 0 0 12px;
+   }
+   .builder-grid {
+     display: grid;
+     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+     gap: 10px;
+     margin-bottom: 14px;
+   }
+   .builder-option {
+     display: flex;
+     align-items: center;
+     gap: 8px;
+     font-size: 13px;
+     color: var(--text);
+     cursor: pointer;
+   }
+   .builder-option input[type="checkbox"] {
+     accent-color: var(--blue);
+     width: 16px;
+     height: 16px;
+   }
+   .builder-output {
+     display: flex;
+     gap: 10px;
+     align-items: center;
+   }
+   .builder-output code {
+     flex: 1;
+     background: var(--panel2);
+     border: 1px solid var(--border);
+     border-radius: 8px;
+     padding: 10px 12px;
+     font-size: 13px;
+     color: var(--gold);
+     white-space: nowrap;
+     overflow-x: auto;
+   }
+
+   /* Hero Demo */
+   .hero-demo {
+     background: var(--panel);
+     border: 1px solid var(--border);
+     border-radius: 12px;
+     padding: 16px;
+     margin-bottom: 32px;
+     overflow: hidden;
+   }
+   .hero-demo .terminal-header {
+     display: flex;
+     gap: 6px;
+     margin-bottom: 10px;
+   }
+   .hero-demo .dot {
+     width: 10px;
+     height: 10px;
+     border-radius: 50%;
+   }
+   .hero-demo .dot.red { background: #ff5a5f; }
+   .hero-demo .dot.yellow { background: #ffd146; }
+   .hero-demo .dot.green { background: #3cde8d; }
+   .hero-demo .terminal-body {
+     font-size: 12.5px;
+     line-height: 1.6;
+     color: var(--dim);
+   }
+   .hero-demo .line {
+     opacity: 0;
+     animation: typeIn 0.4s ease forwards;
+   }
+   .hero-demo .line:nth-child(1) { animation-delay: 0.2s; }
+   .hero-demo .line:nth-child(2) { animation-delay: 0.8s; }
+   .hero-demo .line:nth-child(3) { animation-delay: 1.4s; }
+   .hero-demo .line:nth-child(4) { animation-delay: 2.0s; }
+   .hero-demo .line:nth-child(5) { animation-delay: 2.6s; }
+   .hero-demo .line:nth-child(6) { animation-delay: 3.2s; }
+   .hero-demo .line:nth-child(7) { animation-delay: 3.8s; }
+   .hero-demo .cursor {
+     display: inline-block;
+     width: 8px;
+     height: 14px;
+     background: var(--blue);
+     animation: blink 1s step-end infinite;
+     vertical-align: middle;
+     margin-left: 2px;
+   }
+   @keyframes typeIn {
+     from { opacity: 0; transform: translateY(4px); }
+     to   { opacity: 1; transform: translateY(0); }
+   }
+   @keyframes blink {
+     50% { opacity: 0; }
+   }
+
+   /* FAQ Accordion */
+   .faq {
+     margin-top: 48px;
+   }
+   .faq-item {
+     background: var(--panel);
+     border: 1px solid var(--border);
+     border-radius: 12px;
+     margin-bottom: 10px;
+     overflow: hidden;
+   }
+   .faq-question {
+     width: 100%;
+     text-align: left;
+     background: transparent;
+     color: var(--text);
+     border: none;
+     padding: 14px 16px;
+     font-size: 14px;
+     font-weight: 600;
+     cursor: pointer;
+     display: flex;
+     justify-content: space-between;
+     align-items: center;
+   }
+   .faq-question:hover {
+     background: rgba(255,255,255,0.03);
+   }
+   :root[data-theme="light"] .faq-question:hover {
+     background: rgba(0,0,0,0.03);
+   }
+   .faq-arrow {
+     transition: transform 0.2s ease;
+     color: var(--dim);
+   }
+   .faq-item.open .faq-arrow {
+     transform: rotate(180deg);
+   }
+   .faq-answer {
+     max-height: 0;
+     overflow: hidden;
+     transition: max-height 0.25s ease, padding 0.25s ease;
+     color: var(--dim);
+     font-size: 13.5px;
+     line-height: 1.6;
+   }
+   .faq-item.open .faq-answer {
+     max-height: 600px;
+     padding: 0 16px 14px;
+   }
+
+   /* GitHub Stats */
+   .github-stats {
+     display: flex;
+     gap: 12px;
+     flex-wrap: wrap;
+     margin-top: 8px;
+     font-size: 12.5px;
+     color: var(--dim);
+   }
+   .github-stats a {
+     color: var(--blue);
+     text-decoration: none;
+   }
+   .github-stats a:hover {
+     text-decoration: underline;
+   }
+
+   /* Issue Reporter */
+   .issue-reporter {
+     display: inline-flex;
+     align-items: center;
+     gap: 8px;
+     margin-top: 10px;
+     padding: 10px 14px;
+     border-radius: 8px;
+     font-size: 13px;
+     font-weight: 600;
+     background: rgba(255, 90, 95, 0.12);
+     color: var(--red);
+     border: 1px solid rgba(255, 90, 95, 0.35);
+     text-decoration: none;
+     transition: background 0.2s ease, transform 0.1s ease;
+   }
+   .issue-reporter:hover {
+     background: rgba(255, 90, 95, 0.22);
+     transform: translateY(-1px);
+   }
 </style>
 </head>
 <body>
@@ -309,6 +500,22 @@
     регіональні стандарти, розкладки й дерусифікація — 12 кроків, один запуск.
   </p>
 
+  <div class="hero-demo" aria-hidden="true">
+    <div class="terminal-header">
+      <span class="dot red"></span>
+      <span class="dot yellow"></span>
+      <span class="dot green"></span>
+    </div>
+    <div class="terminal-body">
+      <div class="line"><span style="color:var(--green)">✓</span> <span style="color:var(--dim)">Перевірка прав адміністратора</span> <span style="color:var(--green)">OK</span></div>
+      <div class="line"><span style="color:var(--green)">✓</span> <span style="color:var(--dim)">Точка відновлення</span> <span style="color:var(--green)">Створено</span></div>
+      <div class="line"><span style="color:var(--green)">✓</span> <span style="color:var(--dim)">Встановлення мовного пакету</span> <span style="color:var(--gold)">uk-UA</span></div>
+      <div class="line"><span style="color:var(--green)">✓</span> <span style="color:var(--dim)">Дерусифікація та розкладки</span> <span style="color:var(--gold)">uk-UA + en-US (без RU)</span></div>
+      <div class="line"><span style="color:var(--green)">✓</span> <span style="color:var(--dim)">Перевірка результату</span> <span style="color:var(--green)">6/6 OK</span></div>
+      <div class="line"><span style="color:var(--dim)">Час:</span> <span style="color:var(--text)">2m 14s</span> <span class="cursor"></span></div>
+    </div>
+  </div>
+
   <div class="cmd-box">
     <code id="cmd">завантаження...</code>
     <button id="copyBtn" onclick="copyCmd()" data-i18n="copyBtn">Копіювати</button>
@@ -318,6 +525,23 @@
     перевірений реліз (не гілку в розробці), звіряє контрольну суму архіву й лише
     тоді запускає скрипт із диска.
   </p>
+
+  <section class="builder">
+    <h2 data-i18n="builderTitle">Конструктор команди</h2>
+    <div class="builder-grid">
+      <label class="builder-option"><input type="checkbox" data-flag="Silent"> <span data-i18n="flagSilent">Тихий режим</span></label>
+      <label class="builder-option"><input type="checkbox" data-flag="NoRebootPrompt"> <span data-i18n="flagNoRebootPrompt">Без запиту перезавантаження</span></label>
+      <label class="builder-option"><input type="checkbox" data-flag="Force"> <span data-i18n="flagForce">Примусово перезапустити</span></label>
+      <label class="builder-option"><input type="checkbox" data-flag="WhatIf"> <span data-i18n="flagWhatIf">Режим перевірки (WhatIf)</span></label>
+      <label class="builder-option"><input type="checkbox" data-flag="Revert"> <span data-i18n="flagRevert">Відкат налаштувань</span></label>
+      <label class="builder-option"><input type="radio" name="mode" value="All" checked> <span data-i18n="modeAll">Для всіх користувачів</span></label>
+      <label class="builder-option"><input type="radio" name="mode" value="Current"> <span data-i18n="modeCurrent">Тільки поточний користувач</span></label>
+    </div>
+    <div class="builder-output">
+      <code id="builderCmd">irm ... | iex</code>
+      <button id="builderCopyBtn" data-i18n="copyBtn">Копіювати</button>
+    </div>
+  </section>
 
   <section>
     <h2 data-i18n="whatItDoes">Що робить</h2>
@@ -392,6 +616,37 @@
     </div>
   </section>
 
+  <section class="faq">
+    <h2 data-i18n="faqTitle">Часті запитання</h2>
+    <div class="faq-item">
+      <button class="faq-question" aria-expanded="false">
+        <span data-i18n="faq1Q">Чи безпечно запускати цей скрипт?</span>
+        <span class="faq-arrow">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p data-i18n="faq1A">Скрипт має відкритий вихідний код, перед запуском створює точку відновлення Windows, а при необхідності можна відкотити зміни командою <code>-Revert</code>. Ви також можете ознайомитися з кодом перед виконанням.</p>
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-question" aria-expanded="false">
+        <span data-i18n="faq2Q">Як відкотити зміни назад?</span>
+        <span class="faq-arrow">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p data-i18n="faq2A">Запустіть скрипт з прапорцем <code>-Revert</code>: він автоматично відновить попередні мовні та регіональні налаштування з резервного знімка.</p>
+      </div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-question" aria-expanded="false">
+        <span data-i18n="faq3Q">Які саме параметри системи змінюються?</span>
+        <span class="faq-arrow">▼</span>
+      </button>
+      <div class="faq-answer">
+        <p data-i18n="faq3A">Мова інтерфейсу, системна локаль, регіональні стандарти, часовий пояс, розкладки клавіатури, віддалення російських мовних компонентів та оптимізації. Потрібне перезавантаження.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="support-card-section">
   <div class="support-card">
     <div class="inner-content">
@@ -418,6 +673,14 @@
     <a href="https://github.com/sansej8989/Ukrainizator#readme" target="_blank" data-i18n="linkDocs">Документація</a>
     <a href="https://github.com/sansej8989/Ukrainizator/issues" target="_blank" data-i18n="linkIssues">Повідомити про проблему</a>
   </div>
+
+  <div class="github-stats" id="githubStats">
+    <span data-i18n="statsLoading">Завантаження статистики...</span>
+  </div>
+
+  <a class="issue-reporter" id="issueReporter" href="#" target="_blank" rel="noopener noreferrer">
+    <span>🐛</span> <span data-i18n="issueReporter">Повідомити про проблему</span>
+  </a>
 
   <footer>
     <span data-i18n="footerText">Українізатор — персональний проєкт, з відкритим кодом.</span>
@@ -623,6 +886,83 @@ function init() {
     });
   }
   document.getElementById('year').textContent = '© ' + new Date().getFullYear();
+
+  /* Command Builder */
+  function updateBuilder() {
+    const base = "irm https://raw.githubusercontent.com/sansej8989/Ukrainizator/main/bootstrap.ps1 | iex";
+    const flags = [];
+    document.querySelectorAll('.builder-option input[type=\"checkbox\"]:checked').forEach(cb => {
+      flags.push('-' + cb.getAttribute('data-flag'));
+    });
+    const mode = document.querySelector('.builder-option input[name=\"mode\"]:checked');
+    if (mode && mode.value === 'Current') {
+      flags.push('-Mode Current');
+    }
+    const suffix = flags.length > 0 ? ' ' + flags.join(' ') : '';
+    document.getElementById('builderCmd').textContent = base + suffix;
+  }
+  document.querySelectorAll('.builder-option input').forEach(input => {
+    input.addEventListener('change', updateBuilder);
+  });
+  updateBuilder();
+  document.getElementById('builderCopyBtn').addEventListener('click', () => {
+    const text = document.getElementById('builderCmd').textContent;
+    const lang = getLang();
+    const t = translations[lang === 'auto' ? (navigator.language.startsWith('uk') ? 'uk' : 'en') : lang] || translations.uk;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('builderCopyBtn');
+      const original = btn.textContent;
+      btn.textContent = t.copied;
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = original; btn.classList.remove('copied'); }, 1500);
+    });
+  });
+
+  /* FAQ Accordion */
+  document.querySelectorAll('.faq-question').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.parentElement;
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+      if (!isOpen) {
+        item.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      } else {
+        btn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  });
+
+  /* GitHub Stats */
+  fetch('https://api.github.com/repos/sansej8989/Ukrainizator')
+    .then(r => r.json())
+    .then(data => {
+      const container = document.getElementById('githubStats');
+      if (!container) return;
+      const lang = getLang();
+      const t = translations[lang === 'auto' ? (navigator.language.startsWith('uk') ? 'uk' : 'en') : lang] || translations.uk;
+      const stars = data.stargazers_count ?? 0;
+      const forks = data.forks_count ?? 0;
+      const latest = data.pushed_at ? new Date(data.pushed_at).toLocaleDateString() : '-';
+      container.innerHTML = `
+        <a href="https://github.com/sansej8989/Ukrainizator" target="_blank">⭐ ${stars} ${t.statsStars}</a>
+        <a href="https://github.com/sansej8989/Ukrainizator" target="_blank">⑂ ${forks} ${t.statsForks}</a>
+        <span>📅 ${t.statsLatestRelease}: ${latest}</span>
+      `;
+    })
+    .catch(() => {
+      const container = document.getElementById('githubStats');
+      if (container) container.style.display = 'none';
+    });
+
+  /* Issue Reporter */
+  const issueLink = document.getElementById('issueReporter');
+  if (issueLink) {
+    const os = navigator.platform || 'unknown';
+    const psVersion = 'PowerShell ' + (window.PowerShellVersion || '5.1+');
+    const body = encodeURIComponent(`## Describe the problem\n\n### OS Version\n${os}\n\n### PowerShell Version\n${psVersion}\n\n### Expected behavior\n\n### Actual behavior\n\n### Logs/screenshots`);
+    issueLink.href = `https://github.com/sansej8989/Ukrainizator/issues/new?title=${encodeURIComponent('Bug report')}&body=${body}`;
+  }
 }
 
 init();
