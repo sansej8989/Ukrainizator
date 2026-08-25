@@ -1,4 +1,4 @@
-# modules/AppsLocalization.psm1
+﻿# modules/AppsLocalization.psm1
 # ============================================================
 # Ukrainizator - локалізація стороннього ПЗ:
 # VS Code (settings.json -> locale: uk) та Git (commitEncoding utf-8).

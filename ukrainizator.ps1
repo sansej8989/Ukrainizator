@@ -223,6 +223,9 @@ try {
 
 #region === Інтерактивне меню ===
 if ($PSBoundParameters.Count -eq 0) {
+    # ANSI-рушій ховає курсор для "живого" кадру - у меню курсор потрібен,
+    # інакше Read-Host виглядає як зависання скрипта.
+    Set-CursorVisible $true
     $global:ActiveProfile = Show-InteractiveMenu
 } else {
     $global:ActiveProfile = 'Full'
